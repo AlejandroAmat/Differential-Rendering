@@ -5,8 +5,6 @@ This directory contains small example programs showing how to use the Slang lang
 
 * The [`hello-world`](hello-world/) example shows a minimal example of using Slang shader code more or less like HLSL.
 
-* The [`shader-object`](shader-object/) example shows how Slang's support for interface types can be used to implement shader specialization with simpler logic than preprocessor-based techniques.
-
 * The [`sphere-diff-texturing`](sphere-diff-texturing/) example shows how Slang's support automatic differentiation.
 
 Most of the examples presented here use a software layer called `gfx` (exposed via `slang-gfx.h`) to abstract over the differences between various target APIs/platforms (D3D11, D3D12, OpenGL, Vulkan, CUDA, and CPU).
