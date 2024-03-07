@@ -64,6 +64,29 @@ In the forward pass, texture sampling involves selecting the appropriate mipmap 
 ##### Pipelines and Texture Resources
 To facilitate this complex process, we leverage Slang's capabilities to define custom pipelines and texture resources that are compatible with differential operations. Our pipelines are designed to carry forward rendering operations while capturing necessary derivatives, feeding into the accumulated buffer. Texture resources, on the other hand, are extended to support gradient accumulation and retrieval, making them first-class citizens in the optimization loop.
 
+##### Execution
+![Differential Texture Learning Output](op.png)
+
+The above image showcases the primary output when the setup is correctly configured:
+
+- **Left Quad (Learnt Texture)**: This is the dynamically learnt texture resulting from the inverse rendering process. Over iterative frames, the system refines this texture based on gradient information computed from the loss function.
+
+- **Top Right Quad (Reference Texture)**: The texture displayed here is the target or reference texture. During the differential learning process, the aim is to adjust the learnt texture to closely resemble this reference texture.
+
+- **Bottom Right Quad (Loss Texture)**: Represents the loss texture, which visually encodes the per-pixel difference between the learnt texture and the reference texture. This loss guides the optimization process, where a lower loss indicates a closer match to the target texture.
+
+Each frame's movement correlates with the initialization of a random model-view-projection matrix, highlighting the responsiveness of the learnt texture to transformations within the 3D rendering environment.
+
+##### Expected Behavior
+
+Upon executing the differential texture example, you should observe the following behavior:
+
+- The learnt texture gradually aligns with the reference texture.
+- The loss texture's intensity decreases as the optimization process progresses, indicating an improvement in the learnt texture.
+- Random transformations applied to the model-view-projection matrix demonstrate the robustness of the differential learning process to changes in the 3D scene.
+
+This setup indicates a correct configuration and successful execution of the differential rendering pipeline. It exemplifies how Slang's powerful shading language capabilities can be leveraged for complex rendering tasks such as inverse rendering and texture optimization.
+
 #### Conclusion
 The integration of differential texturing with mipmapping represents a significant advancement in the field of differentiable rendering. It not only enhances the visual fidelity of inverse rendering results but also introduces a new level of detail management in the optimization of textures for real-time graphics. Our approach opens new avenues for research and application in material design, photorealistic rendering, and beyond.
 
