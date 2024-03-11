@@ -39,7 +39,7 @@ VertexStageOutput vertexMain(
     output.uv = position.xy;
     output.sv_position.x = (x + position.x * width) / (float)viewWidth * 2.0f - 1.0f;
     output.sv_position.y = -((y + position.y * height) / (float)viewHeight * 2.0f - 1.0f);
-    output.sv_position.z = 0.5;
+    output.sv_position.z = 0;
     output.sv_position.w = 1.0;
     return output;
 }

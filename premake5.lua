@@ -852,6 +852,7 @@ example "hello-world"
 -- Let's go ahead and set up the projects for our other example now.
 
 example "sphere-diff-texturing"
+example "sphere-texture"
 
 if enableAftermath then
     example "nv-aftermath-example"

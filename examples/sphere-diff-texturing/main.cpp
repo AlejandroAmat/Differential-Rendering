@@ -10,6 +10,14 @@
 //gfx is the abstraction API library used to generalize API targets such as DIRECT,Vulkan,CUDA...
 using namespace gfx;
 using namespace Slang;
+double const M_PI = 3.14159;
+
+
+int stack = 50;
+int sector = 50;
+float sectorStep = 2 * M_PI / sector;
+float stackStep = M_PI / stack;
+float sectorAngle, stackAngle;
 
 //Vertes struct consistion of a 3 dimension float vector
 struct Vertex
@@ -17,14 +25,21 @@ struct Vertex
     float position[3];
 };
 
+
 //Data passing to vertexshader. In this case a 4 point plane (square)
-static const int kVertexCount = 4;
-static const Vertex kVertexData[kVertexCount] = {
+static const int kVertexCount = 15000;
+static Vertex kVertexData[kVertexCount];
+
+static const int kVertexCountQuad = 4;
+static Vertex kVertexDataQuad[kVertexCountQuad]={
     {{0, 0, 0}},
     {{0, 1, 0}},
     {{1, 0, 0}},
     {{1, 1, 0}},
 };
+
+
+
 
 struct AutoDiffTexture : public WindowedAppBase
 {
@@ -203,6 +218,7 @@ struct AutoDiffTexture : public WindowedAppBase
     List<ComPtr<gfx::IResourceView>> gDiffTextureUAVs;
 
     ComPtr<gfx::IBufferResource> gVertexBuffer;
+    ComPtr<gfx::IBufferResource> gVertexBufferQuad;
     ComPtr<gfx::IResourceView> gTexView;
     ComPtr<gfx::ISamplerState> gSampler;
     ComPtr<gfx::IFramebuffer> gRefFrameBuffer;
@@ -352,6 +368,82 @@ struct AutoDiffTexture : public WindowedAppBase
 
         freopen("output.txt", "a", stdout);
         
+        float radius = 0.5;
+        float x,y,z,xy;
+        static Vertex vertices[2601];
+        // Generate vertices
+        int p=0;
+        for(int i = 0; i <= stack; ++i)
+        {
+            stackAngle = M_PI / 2 - i * stackStep;        // starting from pi/2 to -pi/2
+            xy = radius * cosf(stackAngle);             // r * cos(u)
+            z = radius * sinf(stackAngle);              // r * sin(u)
+
+            // add (sectorCount+1) vertices per stack
+            // first and last vertices have same position and normal, but different tex coords
+            for(int j = 0; j <= sector; ++j)
+            {
+                sectorAngle = j * sectorStep;           // starting from 0 to 2pi
+
+                // vertex position (x, y, z)
+                x = xy * cosf(sectorAngle);             // r * cos(u) * cos(v)
+                y = xy * sinf(sectorAngle);             // r * cos(u) * sin(v)
+
+                vertices[p].position[0] = x;
+                vertices[p].position[1]  = y;
+                vertices[p].position[2] = z;
+                p++;
+                
+            }
+         }
+        int k = 0;
+        ;
+        for(int i = 0; i < stack; ++i) {
+            for(int j = 0; j < sector; ++j) {
+                int first = (i * (sector + 1)) + j;
+                int second = first + sector + 1;
+
+                
+                // Add indices for the first triangle: first, second, second + 1
+                kVertexData[k].position[0]= vertices[first].position[0];
+                kVertexData[k].position[1]= vertices[first].position[1];
+                kVertexData[k].position[2]= vertices[first].position[2];
+                k++;
+
+                kVertexData[k].position[0]= vertices[second].position[0];
+                kVertexData[k].position[1]= vertices[second].position[1];
+                kVertexData[k].position[2]= vertices[second].position[2];
+                k++;
+
+                kVertexData[k].position[0]= vertices[second+1].position[0];
+                kVertexData[k].position[1]= vertices[second+1].position[1];
+                kVertexData[k].position[2]= vertices[second+1].position[2];
+                k++;
+
+               
+                
+                kVertexData[k].position[0]= vertices[first].position[0];
+                kVertexData[k].position[1]= vertices[first].position[1];
+                kVertexData[k].position[2]= vertices[first].position[2];
+                k++;
+
+                kVertexData[k].position[0]= vertices[second+1].position[0];
+                kVertexData[k].position[1]= vertices[second+1].position[1];
+                kVertexData[k].position[2]= vertices[second+1].position[2];
+                k++;
+
+                kVertexData[k].position[0]= vertices[first+1].position[0];
+                kVertexData[k].position[1]= vertices[first+1].position[1];
+                kVertexData[k].position[2]= vertices[first+1].position[2];
+                k++;
+
+            }
+        }
+         
+
+        //triangulacion de esfera 
+
+
         //reset learning. Sets learnt texture to clearvalue.
         gWindow->events.keyPress = [this](platform::KeyEventArgs& e)
         {
@@ -384,8 +476,16 @@ struct AutoDiffTexture : public WindowedAppBase
         gVertexBuffer = gDevice->createBufferResource(vertexBufferDesc, &kVertexData[0]);
         if (!gVertexBuffer)
             return SLANG_FAIL;
+        
+        IBufferResource::Desc vertexBufferDescQuad;
+        vertexBufferDescQuad.type = IResource::Type::Buffer;
+        vertexBufferDescQuad.sizeInBytes = kVertexCountQuad * sizeof(Vertex);
+        vertexBufferDescQuad.defaultState = ResourceState::VertexBuffer;
+        gVertexBufferQuad = gDevice->createBufferResource(vertexBufferDescQuad, &kVertexDataQuad[0]);
+        if (!gVertexBufferQuad)
+            return SLANG_FAIL;
 
-
+        
         //load all shaderPrograms and link them to a pipeline.
         //......................................................................................................
         //gRefPipeline::To render Reference Image. Vertex with random modelviewmatrix
@@ -437,7 +537,7 @@ struct AutoDiffTexture : public WindowedAppBase
         }
 
         //create the Reference Texture View and create MipMapOffsets (Check function)
-        gTexView = createTextureFromFile("op.jpg", textureWidth, textureHeight);
+        gTexView = createTextureFromFile("earth.jpg", textureWidth, textureHeight);
         initMipOffsets(textureWidth, textureHeight);
 
 
@@ -541,15 +641,15 @@ struct AutoDiffTexture : public WindowedAppBase
         {
             auto lw = Math::Max(1, w >> i);
             auto lh = Math::Max(1, h >> i);
-            printf("%i \n",  offset);
+            ;
             mipMapOffset.add(offset);
             offset += lw * lh * 4;
             
         }
-        printf("%i \n",  offset);
+       
         mipMapOffset.add(offset);
 
-        printf("%i \n",  sizeof(offset));
+       
        
     }
 
@@ -595,11 +695,11 @@ struct AutoDiffTexture : public WindowedAppBase
 
         setupPipeline(renderEncoder);
 
-        renderEncoder->setVertexBuffer(0, gVertexBuffer);
-        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleStrip);
+        renderEncoder->setVertexBuffer(0, gVertexBufferQuad);
+        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
         
-        renderEncoder->draw(4);
+        renderEncoder->draw(15000);
         renderEncoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
@@ -803,7 +903,7 @@ struct AutoDiffTexture : public WindowedAppBase
         rootCursor["Uniforms"]["viewHeight"].setData(windowHeight);
         rootCursor["Uniforms"]["texture"].setResource(srv);
         rootCursor["Uniforms"]["sampler"].setSampler(gSampler);
-        renderEncoder->setVertexBuffer(0, gVertexBuffer);
+        renderEncoder->setVertexBuffer(0, gVertexBufferQuad);
         renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleStrip);
         renderEncoder->draw(4);
     }

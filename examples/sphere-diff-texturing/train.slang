@@ -169,7 +169,7 @@ VertexStageOutput vertexMain(
 
     float3 position = assembledVertex.position;
 
-    output.uv = position.xy;
+    output.uv = -position.xy;
     output.sv_position = mul(modelViewProjection, float4(position, 1.0));
 
     return output;
