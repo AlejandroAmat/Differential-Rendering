@@ -23,6 +23,7 @@ float sectorAngle, stackAngle;
 struct Vertex
 {
     float position[3];
+    float uv[2];
 };
 
 
@@ -32,10 +33,10 @@ static Vertex kVertexData[kVertexCount];
 
 static const int kVertexCountQuad = 4;
 static Vertex kVertexDataQuad[kVertexCountQuad]={
-    {{0, 0, 0}},
-    {{0, 1, 0}},
-    {{1, 0, 0}},
-    {{1, 1, 0}},
+    {{0, 0, 0},{0,0}},
+    {{0, 1, 0},{0,0}},
+    {{1, 0, 0},{0,0}},
+    {{1, 1, 0},{0,0}},
 };
 
 
@@ -378,13 +379,13 @@ struct AutoDiffTexture : public WindowedAppBase
             stackAngle = M_PI / 2 - i * stackStep;        // starting from pi/2 to -pi/2
             xy = radius * cosf(stackAngle);             // r * cos(u)
             z = radius * sinf(stackAngle);              // r * sin(u)
-
+            float v = (float)i / stack;
             // add (sectorCount+1) vertices per stack
             // first and last vertices have same position and normal, but different tex coords
             for(int j = 0; j <= sector; ++j)
             {
                 sectorAngle = j * sectorStep;           // starting from 0 to 2pi
-
+                float u = (float)j / sector;
                 // vertex position (x, y, z)
                 x = xy * cosf(sectorAngle);             // r * cos(u) * cos(v)
                 y = xy * sinf(sectorAngle);             // r * cos(u) * sin(v)
@@ -392,6 +393,8 @@ struct AutoDiffTexture : public WindowedAppBase
                 vertices[p].position[0] = x;
                 vertices[p].position[1]  = y;
                 vertices[p].position[2] = z;
+                vertices[p].uv[0] = u;
+                vertices[p].uv[1] = v;
                 p++;
                 
             }
@@ -404,20 +407,31 @@ struct AutoDiffTexture : public WindowedAppBase
                 int second = first + sector + 1;
 
                 
-                // Add indices for the first triangle: first, second, second + 1
+                 // Add indices for the first triangle: first, second, second + 1
                 kVertexData[k].position[0]= vertices[first].position[0];
                 kVertexData[k].position[1]= vertices[first].position[1];
                 kVertexData[k].position[2]= vertices[first].position[2];
+
+                kVertexData[k].uv[0]= vertices[first].uv[0];
+                kVertexData[k].uv[1]= vertices[first].uv[1];
                 k++;
+
 
                 kVertexData[k].position[0]= vertices[second].position[0];
                 kVertexData[k].position[1]= vertices[second].position[1];
                 kVertexData[k].position[2]= vertices[second].position[2];
+
+                kVertexData[k].uv[0]= vertices[second].uv[0];
+                kVertexData[k].uv[1]= vertices[second].uv[1];
                 k++;
+
 
                 kVertexData[k].position[0]= vertices[second+1].position[0];
                 kVertexData[k].position[1]= vertices[second+1].position[1];
                 kVertexData[k].position[2]= vertices[second+1].position[2];
+
+                kVertexData[k].uv[0]= vertices[second+1].uv[0];
+                kVertexData[k].uv[1]= vertices[second+1].uv[1];
                 k++;
 
                
@@ -425,16 +439,27 @@ struct AutoDiffTexture : public WindowedAppBase
                 kVertexData[k].position[0]= vertices[first].position[0];
                 kVertexData[k].position[1]= vertices[first].position[1];
                 kVertexData[k].position[2]= vertices[first].position[2];
+
+                kVertexData[k].uv[0]= vertices[first].uv[0];
+                kVertexData[k].uv[1]= vertices[first].uv[1];
                 k++;
+                
 
                 kVertexData[k].position[0]= vertices[second+1].position[0];
                 kVertexData[k].position[1]= vertices[second+1].position[1];
                 kVertexData[k].position[2]= vertices[second+1].position[2];
+
+                kVertexData[k].uv[0]= vertices[second+1].uv[0];
+                kVertexData[k].uv[1]= vertices[second+1].uv[1];
                 k++;
+
 
                 kVertexData[k].position[0]= vertices[first+1].position[0];
                 kVertexData[k].position[1]= vertices[first+1].position[1];
                 kVertexData[k].position[2]= vertices[first+1].position[2];
+                
+                kVertexData[k].uv[0]= vertices[first+1].uv[0];
+                kVertexData[k].uv[1]= vertices[first+1].uv[1];
                 k++;
 
             }
@@ -463,8 +488,9 @@ struct AutoDiffTexture : public WindowedAppBase
 
         //define the input layout so the rendering pipelines now how to expect vertices position.
         InputElementDesc inputElements[] = {
-            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)}};
-        auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 1);
+            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
+            {"UV", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, uv)}};
+        auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 2);
         if (!inputLayout)
             return SLANG_FAIL;
 
@@ -667,7 +693,7 @@ struct AutoDiffTexture : public WindowedAppBase
             glm::vec3(
                 -0.6f + 0.2f * (rand() / (float)RAND_MAX),
                 -0.6f + 0.2f * (rand() / (float)RAND_MAX),
-                -1.0f));
+                -2.0f));
         auto rot = glm::rotate(translate, -glm::pi<float>() * rotX, glm::vec3(1.0f, 0.0f, 0.0f));
         rot = glm::rotate(rot, -glm::pi<float>() * rotY, glm::vec3(0.0f, 1.0f, 0.0f));
         auto transformMatrix = matProj * rot;
@@ -695,7 +721,7 @@ struct AutoDiffTexture : public WindowedAppBase
 
         setupPipeline(renderEncoder);
 
-        renderEncoder->setVertexBuffer(0, gVertexBufferQuad);
+        renderEncoder->setVertexBuffer(0, gVertexBuffer);
         renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
         

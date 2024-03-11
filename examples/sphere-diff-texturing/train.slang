@@ -124,7 +124,8 @@ cbuffer Uniforms
 
 struct AssembledVertex
 {
-    float3	position : POSITION;
+    float3 position : POSITION;
+    float2 uv : UV;
 };
 
 struct Fragment
@@ -169,7 +170,7 @@ VertexStageOutput vertexMain(
 
     float3 position = assembledVertex.position;
 
-    output.uv = -position.xy;
+    output.uv = assembledVertex.uv;
     output.sv_position = mul(modelViewProjection, float4(position, 1.0));
 
     return output;
