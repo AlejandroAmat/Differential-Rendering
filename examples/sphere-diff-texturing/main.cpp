@@ -292,7 +292,7 @@ struct AutoDiffTexture : public WindowedAppBase
         desc.depthStencilView = gDepthTextureView;
         return gDevice->createFramebuffer(desc);
     }
-
+    
     //create each of the 4 texture Views from texture Resource. 
 
     ComPtr<gfx::IResourceView> createRTV(ITextureResource* tex, Format f)
@@ -346,8 +346,24 @@ struct AutoDiffTexture : public WindowedAppBase
         GraphicsPipelineStateDesc desc;
         desc.inputLayout = inputLayout;
         desc.program = program;
-        desc.rasterizer.cullMode = gfx::CullMode::None;
         desc.framebufferLayout = gFramebufferLayout;
+        desc.primitiveType = PrimitiveType::Triangle;
+       // desc.depthStencil.depthFunc = ComparisonFunc::LessEqual;
+        //desc.depthStencil.depthTestEnable = true;
+        desc.rasterizer.cullMode = gfx::CullMode::Front;
+        auto pipelineState = gDevice->createGraphicsPipelineState(desc);
+        return pipelineState;
+    }
+
+     ComPtr<gfx::IPipelineState> createRenderPipelineStateQuad(
+        IInputLayout* inputLayout, IShaderProgram* program)
+    {
+        GraphicsPipelineStateDesc desc;
+        desc.inputLayout = inputLayout;
+        desc.program = program;
+        desc.framebufferLayout = gFramebufferLayout;
+        desc.depthStencil.depthFunc = ComparisonFunc::LessEqual;
+        desc.depthStencil.depthTestEnable = true;
         auto pipelineState = gDevice->createGraphicsPipelineState(desc);
         return pipelineState;
     }
@@ -472,10 +488,25 @@ struct AutoDiffTexture : public WindowedAppBase
         //reset learning. Sets learnt texture to clearvalue.
         gWindow->events.keyPress = [this](platform::KeyEventArgs& e)
         {
-            if (e.keyChar == 'R' || e.keyChar == 'r')
+            if (e.keyChar == 'R' || e.keyChar == 'r'){
                 resetLearntTexture = true;
+                start_time = std::chrono::steady_clock::now();
+
+            }
+                
+
+                if (e.keyChar == 's' || e.keyChar == 'S') {
+                    auto current = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start_time).count();
+                    
+                    double seconds = current / 1000000.0; // Ensure division by a double to get a floating-point result
+                    printf("%.6lf s\n", seconds); // Use "%.3lf" to print the double value with 3 digits after the decimal point
+                }
+                
+               
+               
         };
 
+         
         //defines values for clear components.
         kClearValue.color.floatValues[0] = 0.3f;
         kClearValue.color.floatValues[1] = 0.5f;
@@ -538,7 +569,7 @@ struct AutoDiffTexture : public WindowedAppBase
             ComPtr<IShaderProgram> shaderProgram;
             SLANG_RETURN_ON_FAIL(
                 loadRenderProgram(gDevice, "draw-quad", "fragmentMain", shaderProgram.writeRef()));
-            gDrawQuadPipelineState = createRenderPipelineState(inputLayout, shaderProgram);
+            gDrawQuadPipelineState = createRenderPipelineStateQuad(inputLayout, shaderProgram);
         }
         {
             ComPtr<IShaderProgram> shaderProgram;
@@ -683,17 +714,17 @@ struct AutoDiffTexture : public WindowedAppBase
     //object and loss. 
     glm::mat4x4 getTransformMatrix()
     {
-        float rotX = (rand() / (float)RAND_MAX) * 0.3f;
-        float rotY = (rand() / (float)RAND_MAX) * 0.2f;
+        float rotX = (rand() / (float)RAND_MAX*2);
+        float rotY = (rand() / (float)RAND_MAX*2) ;
         glm::mat4x4 matProj = glm::perspectiveRH_ZO(
             glm::radians(60.0f), (float)windowWidth / (float)windowHeight, 0.1f, 1000.0f);
         auto identity = glm::mat4(1.0f);
-        auto translate = glm::translate(
+                auto translate = glm::translate(
             identity,
             glm::vec3(
-                -0.6f + 0.2f * (rand() / (float)RAND_MAX),
-                -0.6f + 0.2f * (rand() / (float)RAND_MAX),
-                -2.0f));
+                -0 + 0.2f * (rand() / (float)RAND_MAX),
+                -0 + 0.1f * (rand() / (float)RAND_MAX),
+                -1.1f));
         auto rot = glm::rotate(translate, -glm::pi<float>() * rotX, glm::vec3(1.0f, 0.0f, 0.0f));
         rot = glm::rotate(rot, -glm::pi<float>() * rotY, glm::vec3(0.0f, 1.0f, 0.0f));
         auto transformMatrix = matProj * rot;
@@ -701,7 +732,8 @@ struct AutoDiffTexture : public WindowedAppBase
         return transformMatrix;
        
     }
-
+    std::chrono::steady_clock::time_point start_time; // Variable to store program start time
+    long current;
 
     //Defines function for rendering Image with template. Creates render encoder with FrameBuffer with the according
     //Index (passed in render frame). Sets viewport, vertexBuffer and Topology and draws.
@@ -713,6 +745,7 @@ struct AutoDiffTexture : public WindowedAppBase
             gTransientHeaps[transientHeapIndex]->createCommandBuffer();
         auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, fb);
 
+        
         gfx::Viewport viewport = {};
         viewport.maxZ = 1.0f;
         viewport.extentX = (float)windowWidth;

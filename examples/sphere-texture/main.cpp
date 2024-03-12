@@ -217,6 +217,7 @@ ComPtr<gfx::IResourceView> gTexView;
 ComPtr<gfx::ISamplerState> gSampler;
 
 
+
 List<uint32_t> mipMapOffset;
     int textureWidth;
     int textureHeight;
@@ -225,12 +226,23 @@ List<uint32_t> mipMapOffset;
 // compiles our Slang shade code, we can go through the rest
 // of the application code without as much commentary.
 //
+
+
 Slang::Result initialize()
 {
     // Create a window for our application to render into.
     //
-    initializeBase("hello-world", 1024, 768);
+   
 
+
+
+    freopen("output.txt", "a", stdout);
+    initializeBase("hello-world", 1024, 768);
+     gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
+    gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
+    gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
+    gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
+    gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
     // We will create objects needed to configur the "input assembler"
     // (IA) stage of the D3D pipeline.
     //
@@ -246,12 +258,14 @@ Slang::Result initialize()
         2);
     if(!inputLayout) return SLANG_FAIL;
 
-    gfx::ISamplerState::Desc samplerDesc = {};
-        //samplerDesc.maxLOD = 0.0f;
+     gfx::ISamplerState::Desc samplerDesc = {};
+    samplerDesc.addressU = gfx::TextureAddressingMode::ClampToEdge;
+    samplerDesc.addressV = gfx::TextureAddressingMode::ClampToEdge;
+    samplerDesc.addressW = gfx::TextureAddressingMode::ClampToEdge;
     gSampler = gDevice->createSamplerState(samplerDesc);
     
     gTexView = createTextureFromFile("earth.jpg", textureWidth, textureHeight);
-    initMipOffsets(textureWidth, textureHeight);
+    //initMipOffsets(textureWidth, textureHeight);
     // Next we allocate a vertex buffer for our pre-initialized
     // vertex data.
     //
@@ -282,6 +296,8 @@ Slang::Result initialize()
                 vertices[p].uv[0] = u;
                 vertices[p].uv[1] = v;
                 p++;
+
+                if(u>1 || v>1) printf ("se pasa po ueon.");
                 
             }
          }
@@ -371,6 +387,9 @@ Slang::Result initialize()
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
     desc.framebufferLayout = gFramebufferLayout;
+    //desc.primitiveType = PrimitiveType::Triangle;
+    desc.depthStencil.depthFunc = ComparisonFunc::Less;
+    desc.depthStencil.depthTestEnable = true;
     auto pipelineState = gDevice->createGraphicsPipelineState(desc);
     if (!pipelineState)
         return SLANG_FAIL;
@@ -402,8 +421,8 @@ void initMipOffsets(int w, int h)
 
     glm::mat4x4 getTransformMatrix()
     {
-        float rotX = (rand() / (float)RAND_MAX) * 0.3f;
-        float rotY = (rand() / (float)RAND_MAX) * 0.2f;
+        float rotX = (rand() / (float)RAND_MAX) * 2.0f;
+        float rotY = (rand() / (float)RAND_MAX) * 1.0f;
         glm::mat4x4 matProj = glm::perspectiveRH_ZO(
             glm::radians(60.0f), (float)windowWidth / (float)windowHeight, 0.1f, 1000.0f);
         auto identity = glm::mat4(1.0f);
@@ -421,17 +440,125 @@ void initMipOffsets(int w, int h)
        
     }
 
+
+glm::vec3 cameraPosition = glm::vec3(1.75, 1.25, 5);
+glm::quat cameraOrientation = glm::quat(1, glm::vec3(0));
+
+float translationScale = 0.5f;
+float rotationScale = 0.025f;
+
+// In order to control camera movement, we will
+// use good old WASD
+bool wPressed = false;
+bool aPressed = false;
+bool sPressed = false;
+bool dPressed = false;
+
+bool isMouseDown = false;
+float lastMouseX = 0.0f;
+float lastMouseY = 0.0f;
+
+void setKeyState(platform::KeyCode key, bool state)
+{
+    switch (key)
+    {
+    default:
+        break;
+    case platform::KeyCode::W:
+        wPressed = state;
+        break;
+    case platform::KeyCode::A:
+        aPressed = state;
+        break;
+    case platform::KeyCode::S:
+        sPressed = state;
+        break;
+    case platform::KeyCode::D:
+        dPressed = state;
+        break;
+    }
+}
+void onKeyDown(platform::KeyEventArgs args) { setKeyState(args.key, true); }
+void onKeyUp(platform::KeyEventArgs args) { setKeyState(args.key, false); }
+
+void onMouseDown(platform::MouseEventArgs args)
+{
+    isMouseDown = true;
+    lastMouseX = (float)args.x;
+    lastMouseY = (float)args.y;
+}
+
+void onMouseMove(platform::MouseEventArgs args)
+{
+    if (isMouseDown)
+    {
+        float deltaX = args.x - lastMouseX;
+        float deltaY = args.y - lastMouseY;
+
+        cameraOrientation =
+            glm::rotate(cameraOrientation, -deltaX * rotationScale, glm::vec3(0, 1, 0));
+        cameraOrientation =
+            glm::rotate(cameraOrientation, -deltaY * rotationScale, glm::vec3(1, 0, 0));
+
+        cameraOrientation = normalize(cameraOrientation);
+
+        lastMouseX = (float)args.x;
+        lastMouseY = (float)args.y;
+    }
+}
+void onMouseUp(platform::MouseEventArgs args)
+{
+    isMouseDown = false;
+}
+uint64_t lastTime = 0;
 // With the initialization out of the way, we can now turn our attention
 // to the per-frame rendering logic. As with the initialization, there is
 // nothing really Slang-specific here, so the commentary doesn't need
 // to be very detailed.
 //
 virtual void renderFrame(int frameBufferIndex) override
-{
+{       
+    if(!lastTime) lastTime = getCurrentTime();
+    uint64_t currentTime = getCurrentTime();
+    float deltaTime = float(double(currentTime - lastTime) / double(getTimerFrequency()));
+    lastTime = currentTime;
+
     ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
     auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
+     glm::mat4x4 identity = glm::mat4x4(1.0f);
+    auto clientRect = getWindow()->getClientRect();
+    if (clientRect.height == 0)
+        return;
+    glm::mat4x4 projection = glm::perspectiveRH_ZO(
+        glm::radians(60.0f), float(clientRect.width) / float(clientRect.height),
+        0.1f,
+        1000.0f);
+    glm::mat3x3 cameraOrientationMat(cameraOrientation);
+    glm::vec3 forward = -cameraOrientationMat[2];
+    glm::vec3 right = cameraOrientationMat[0];
 
-     auto transformMatrix = getTransformMatrix();
+    glm::vec3 movement = glm::vec3(0);
+    if(wPressed) movement += forward;
+    if(sPressed) movement -= forward;
+    if(aPressed) movement -= right;
+    if(dPressed) movement += right;
+
+    cameraPosition += deltaTime * translationScale * movement;
+
+    glm::mat4x4 view = identity;
+    view *= glm::mat4x4(inverse(cameraOrientation));
+    view = glm::translate(view, -cameraPosition);
+
+    glm::mat4x4 viewProjection = projection * view;
+    auto deviceInfo = gDevice->getDeviceInfo();
+    glm::mat4x4 correctionMatrix;
+    memcpy(&correctionMatrix, deviceInfo.identityProjectionMatrix, sizeof(float)*16);
+    viewProjection = correctionMatrix * viewProjection;
+    // glm uses column-major layout, we need to translate it to row-major.
+    viewProjection = glm::transpose(viewProjection);
+
+
+     auto transformMatrix = viewProjection;
     gfx::Viewport viewport = {};
     viewport.maxZ = 1.0f;
     viewport.extentX = (float)windowWidth;
@@ -475,7 +602,7 @@ virtual void renderFrame(int frameBufferIndex) override
     // basis, even though the data that is loaded does not change
     // per-frame (we always use an identity matrix).
     //
-    auto deviceInfo = gDevice->getDeviceInfo();
+    deviceInfo = gDevice->getDeviceInfo();
 
     // We know that `rootObject` is a root shader object created
     // from our program, and that it is set up to hold values for
