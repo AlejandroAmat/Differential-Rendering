@@ -76,12 +76,15 @@ struct DifferentiableTexture
         float lengthX = length(dX);
         float lengthY = length(dY);
         float LOD = log2(max(lengthX, lengthY));
+      //  if (LOD<=3) return float4(1, 1, 1, 1);
         float maxLOD = levels - 1;
         float clampedLOD = max(minLOD, (min(maxLOD, LOD)));
 
         float lodFrac = clampedLOD - no_diff(floor(clampedLOD));
-        uint lod0 = (uint)floor(clampedLOD);
-        uint lod1 = min(levels - 1, lod0 + 1);
+        // uint lod0 = (uint)floor(clampedLOD);
+        // uint lod1 = min(levels - 1, lod0 + 1);
+        uint lod0 = 0;
+        uint lod1 = 1;
         float weightLod0 = 1.0 - lodFrac;
         float weightLod1 = lodFrac;
 
@@ -179,6 +182,7 @@ VertexStageOutput vertexMain(
 float3 sqr(float3 v) { return v * v; }
 
 [shader("fragment")]
+
 float4 fragmentMain(
     float2 uv : UV) : SV_Target
 {

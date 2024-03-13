@@ -13,8 +13,8 @@ using namespace Slang;
 double const M_PI = 3.14159;
 
 
-int stack = 50;
-int sector = 50;
+int stack = 200;
+int sector = 200;
 float sectorStep = 2 * M_PI / sector;
 float stackStep = M_PI / stack;
 float sectorAngle, stackAngle;
@@ -28,7 +28,7 @@ struct Vertex
 
 
 //Data passing to vertexshader. In this case a 4 point plane (square)
-static const int kVertexCount = 15000;
+static const int kVertexCount = 80600;
 static Vertex kVertexData[kVertexCount];
 
 static const int kVertexCountQuad = 4;
@@ -292,7 +292,7 @@ struct AutoDiffTexture : public WindowedAppBase
         desc.depthStencilView = gDepthTextureView;
         return gDevice->createFramebuffer(desc);
     }
-    
+
     //create each of the 4 texture Views from texture Resource. 
 
     ComPtr<gfx::IResourceView> createRTV(ITextureResource* tex, Format f)
@@ -387,7 +387,7 @@ struct AutoDiffTexture : public WindowedAppBase
         
         float radius = 0.5;
         float x,y,z,xy;
-        static Vertex vertices[2601];
+        static Vertex vertices[40401];
         // Generate vertices
         int p=0;
         for(int i = 0; i <= stack; ++i)
@@ -415,69 +415,50 @@ struct AutoDiffTexture : public WindowedAppBase
                 
             }
          }
-        int k = 0;
-        ;
-        for(int i = 0; i < stack; ++i) {
-            for(int j = 0; j < sector; ++j) {
+       int index = 0;
+        for(int i = 0; i < stack; ++i)
+        {
+            for(int j = 0; j <= sector; ++j)
+            {
                 int first = (i * (sector + 1)) + j;
                 int second = first + sector + 1;
 
-                
-                 // Add indices for the first triangle: first, second, second + 1
-                kVertexData[k].position[0]= vertices[first].position[0];
-                kVertexData[k].position[1]= vertices[first].position[1];
-                kVertexData[k].position[2]= vertices[first].position[2];
+                // First vertex of the quad
+                kVertexData[index].position[0] = vertices[first].position[0];
+                kVertexData[index].position[1] = vertices[first].position[1];
+                kVertexData[index].position[2] = vertices[first].position[2];
+                kVertexData[index].uv[0] = vertices[first].uv[0];
+                kVertexData[index].uv[1] = vertices[first].uv[1];
+                index++;
 
-                kVertexData[k].uv[0]= vertices[first].uv[0];
-                kVertexData[k].uv[1]= vertices[first].uv[1];
-                k++;
+                // Second vertex of the quad
+                kVertexData[index].position[0] = vertices[second].position[0];
+                kVertexData[index].position[1] = vertices[second].position[1];
+                kVertexData[index].position[2] = vertices[second].position[2];
+                kVertexData[index].uv[0] = vertices[second].uv[0];
+                kVertexData[index].uv[1] = vertices[second].uv[1];
+                index++;
 
+                // When j == sector, it means we have completed a loop around the sphere,
+                // and we need to connect the strip back to the starting point, so we
+                // repeat the first two vertices of the strip to close it properly.
+                if(j == sector) {
+                    // Repeat first vertex of the strip
+                    kVertexData[index].position[0] = vertices[first - j].position[0];
+                    kVertexData[index].position[1] = vertices[first - j].position[1];
+                    kVertexData[index].position[2] = vertices[first - j].position[2];
+                    kVertexData[index].uv[0] = vertices[first - j].uv[0];
+                    kVertexData[index].uv[1] = vertices[first - j].uv[1];
+                    index++;
 
-                kVertexData[k].position[0]= vertices[second].position[0];
-                kVertexData[k].position[1]= vertices[second].position[1];
-                kVertexData[k].position[2]= vertices[second].position[2];
-
-                kVertexData[k].uv[0]= vertices[second].uv[0];
-                kVertexData[k].uv[1]= vertices[second].uv[1];
-                k++;
-
-
-                kVertexData[k].position[0]= vertices[second+1].position[0];
-                kVertexData[k].position[1]= vertices[second+1].position[1];
-                kVertexData[k].position[2]= vertices[second+1].position[2];
-
-                kVertexData[k].uv[0]= vertices[second+1].uv[0];
-                kVertexData[k].uv[1]= vertices[second+1].uv[1];
-                k++;
-
-               
-                
-                kVertexData[k].position[0]= vertices[first].position[0];
-                kVertexData[k].position[1]= vertices[first].position[1];
-                kVertexData[k].position[2]= vertices[first].position[2];
-
-                kVertexData[k].uv[0]= vertices[first].uv[0];
-                kVertexData[k].uv[1]= vertices[first].uv[1];
-                k++;
-                
-
-                kVertexData[k].position[0]= vertices[second+1].position[0];
-                kVertexData[k].position[1]= vertices[second+1].position[1];
-                kVertexData[k].position[2]= vertices[second+1].position[2];
-
-                kVertexData[k].uv[0]= vertices[second+1].uv[0];
-                kVertexData[k].uv[1]= vertices[second+1].uv[1];
-                k++;
-
-
-                kVertexData[k].position[0]= vertices[first+1].position[0];
-                kVertexData[k].position[1]= vertices[first+1].position[1];
-                kVertexData[k].position[2]= vertices[first+1].position[2];
-                
-                kVertexData[k].uv[0]= vertices[first+1].uv[0];
-                kVertexData[k].uv[1]= vertices[first+1].uv[1];
-                k++;
-
+                    // Repeat second vertex of the strip (which is 'second - j')
+                    kVertexData[index].position[0] = vertices[second - j].position[0];
+                    kVertexData[index].position[1] = vertices[second - j].position[1];
+                    kVertexData[index].position[2] = vertices[second - j].position[2];
+                    kVertexData[index].uv[0] = vertices[second - j].uv[0];
+                    kVertexData[index].uv[1] = vertices[second - j].uv[1];
+                    index++;
+                }
             }
         }
          
@@ -488,25 +469,10 @@ struct AutoDiffTexture : public WindowedAppBase
         //reset learning. Sets learnt texture to clearvalue.
         gWindow->events.keyPress = [this](platform::KeyEventArgs& e)
         {
-            if (e.keyChar == 'R' || e.keyChar == 'r'){
+            if (e.keyChar == 'R' || e.keyChar == 'r')
                 resetLearntTexture = true;
-                start_time = std::chrono::steady_clock::now();
-
-            }
-                
-
-                if (e.keyChar == 's' || e.keyChar == 'S') {
-                    auto current = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start_time).count();
-                    
-                    double seconds = current / 1000000.0; // Ensure division by a double to get a floating-point result
-                    printf("%.6lf s\n", seconds); // Use "%.3lf" to print the double value with 3 digits after the decimal point
-                }
-                
-               
-               
         };
 
-         
         //defines values for clear components.
         kClearValue.color.floatValues[0] = 0.3f;
         kClearValue.color.floatValues[1] = 0.5f;
@@ -594,7 +560,7 @@ struct AutoDiffTexture : public WindowedAppBase
         }
 
         //create the Reference Texture View and create MipMapOffsets (Check function)
-        gTexView = createTextureFromFile("earth.jpg", textureWidth, textureHeight);
+        gTexView = createTextureFromFile("ee.jpg", textureWidth, textureHeight);
         initMipOffsets(textureWidth, textureHeight);
 
 
@@ -732,8 +698,7 @@ struct AutoDiffTexture : public WindowedAppBase
         return transformMatrix;
        
     }
-    std::chrono::steady_clock::time_point start_time; // Variable to store program start time
-    long current;
+
 
     //Defines function for rendering Image with template. Creates render encoder with FrameBuffer with the according
     //Index (passed in render frame). Sets viewport, vertexBuffer and Topology and draws.
@@ -745,7 +710,6 @@ struct AutoDiffTexture : public WindowedAppBase
             gTransientHeaps[transientHeapIndex]->createCommandBuffer();
         auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, fb);
 
-        
         gfx::Viewport viewport = {};
         viewport.maxZ = 1.0f;
         viewport.extentX = (float)windowWidth;
@@ -755,10 +719,10 @@ struct AutoDiffTexture : public WindowedAppBase
         setupPipeline(renderEncoder);
 
         renderEncoder->setVertexBuffer(0, gVertexBuffer);
-        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+        renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleStrip);
 
         
-        renderEncoder->draw(15000);
+        renderEncoder->draw(80600);
         renderEncoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
