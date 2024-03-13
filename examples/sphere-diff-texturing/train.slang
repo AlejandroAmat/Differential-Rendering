@@ -84,7 +84,7 @@ struct DifferentiableTexture
         // uint lod0 = (uint)floor(clampedLOD);
         // uint lod1 = min(levels - 1, lod0 + 1);
         uint lod0 = 0;
-        uint lod1 = 1;
+        uint lod1 = 2;
         float weightLod0 = 1.0 - lodFrac;
         float weightLod1 = lodFrac;
 

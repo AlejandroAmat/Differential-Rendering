@@ -264,7 +264,7 @@ Slang::Result initialize()
     samplerDesc.addressW = gfx::TextureAddressingMode::ClampToEdge;
     gSampler = gDevice->createSamplerState(samplerDesc);
     
-    gTexView = createTextureFromFile("earth.jpg", textureWidth, textureHeight);
+    gTexView = createTextureFromFile("ee.jpg", textureWidth, textureHeight);
     //initMipOffsets(textureWidth, textureHeight);
     // Next we allocate a vertex buffer for our pre-initialized
     // vertex data.
