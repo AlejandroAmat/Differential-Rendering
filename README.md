@@ -65,7 +65,7 @@ In the forward pass, texture sampling involves selecting the appropriate mipmap 
 To facilitate this complex process, we leverage Slang's capabilities to define custom pipelines and texture resources that are compatible with differential operations. Our pipelines are designed to carry forward rendering operations while capturing necessary derivatives, feeding into the accumulated buffer. Texture resources, on the other hand, are extended to support gradient accumulation and retrieval, making them first-class citizens in the optimization loop.
 
 ##### Execution
-![Differential Texture Learning Output](op.png)
+![Differential Texture Learning Output](sphere-diff.png)
 
 The above image showcases the primary output when the setup is correctly configured:
 
