@@ -30,4 +30,15 @@
 0.850191 s
 
 
-51501001010010203002030080600806008060018090018090018090020300180900180900180900180900180900180900180900180900180900180900180900180900180900180900
+51501001010010203002030080600806008060018090018090018090020300180900180900180900180900180900180900180900180900180900180900180900180900180900180900[Slang]: ERROR: dxc 1.6: : error : error: use of undeclared identifier 'printf'
+
+[Slang]: ERROR: dxc 1.6: : error : error: use of undeclared identifier 'printf'
+error: use of undeclared identifier 'printf'
+error: use of undeclared identifier 'printf'
+
+[Slang]: ERROR: dxc 1.6: : error : error: use of undeclared identifier 'printf'
+
+[Slang]: ERROR: dxc 1.6: : error : error: use of undeclared identifier 'printf'
+error: use of undeclared identifier 'printf'
+error: use of undeclared identifier 'printf'
+

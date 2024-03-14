@@ -224,6 +224,7 @@ struct AutoDiffTexture : public WindowedAppBase
     ComPtr<gfx::ISamplerState> gSampler;
     ComPtr<gfx::IFramebuffer> gRefFrameBuffer;
     ComPtr<gfx::IFramebuffer> gIterFrameBuffer;
+    ComPtr<gfx::IFramebuffer> gResultFrameBuffer;
 
     ComPtr<gfx::ITextureResource> gDepthTexture;
     ComPtr<gfx::IResourceView> gDepthTextureView;
@@ -238,8 +239,13 @@ struct AutoDiffTexture : public WindowedAppBase
     ComPtr<gfx::IResourceView> gRefImageSRV;
     ComPtr<gfx::IResourceView> gRefImageRTV;
 
+     ComPtr<gfx::ITextureResource> gResultImage;
+    ComPtr<gfx::IResourceView> gResultImageSRV;
+    ComPtr<gfx::IResourceView> gResultImageRTV;
+
     ComPtr<gfx::IBufferResource> gAccumulateBuffer;
     ComPtr<gfx::IBufferResource> gReconstructBuffer;
+    ComPtr<gfx::IBufferResource> gLossBuffer;
     ComPtr<gfx::IResourceView> gAccumulateBufferView;
     ComPtr<gfx::IResourceView> gReconstructBufferView;
 
@@ -253,6 +259,7 @@ struct AutoDiffTexture : public WindowedAppBase
         textureDesc.allowedStates.add(ResourceState::ShaderResource);
         textureDesc.allowedStates.add(ResourceState::UnorderedAccess);
         textureDesc.allowedStates.add(ResourceState::RenderTarget);
+        textureDesc.allowedStates.add(ResourceState::CopySource);
         textureDesc.defaultState = ResourceState::RenderTarget;
         textureDesc.format = format;
         textureDesc.numMipLevels = levels;
@@ -621,12 +628,17 @@ struct AutoDiffTexture : public WindowedAppBase
         gRefImageRTV = createRTV(gRefImage, Format::R8G8B8A8_UNORM);
         gRefImageSRV = createSRV(gRefImage);
 
+        gResultImage = createRenderTargetTexture(Format::R8G8B8A8_UNORM, windowWidth, windowHeight, 1);
+        gResultImageRTV = createRTV(gResultImage, Format::R8G8B8A8_UNORM);
+        gResultImageSRV = createSRV(gResultImage);
+
         gIterImage = createRenderTargetTexture(Format::R8G8B8A8_UNORM, windowWidth, windowHeight, 1);
         gIterImageRTV = createRTV(gIterImage, Format::R8G8B8A8_UNORM);
         gIterImageSRV = createSRV(gIterImage);
 
         gRefFrameBuffer = createRenderTargetFramebuffer(gRefImageRTV);
         gIterFrameBuffer = createRenderTargetFramebuffer(gIterImageRTV);
+        gResultFrameBuffer = createRenderTargetFramebuffer(gResultImageRTV);
 
         //Set Textures to initial State and clear learning and diff.
 
@@ -636,6 +648,7 @@ struct AutoDiffTexture : public WindowedAppBase
             encoder->textureBarrier(gLearningTexture, ResourceState::RenderTarget, ResourceState::UnorderedAccess);
             encoder->textureBarrier(gDiffTexture, ResourceState::RenderTarget, ResourceState::UnorderedAccess);
             encoder->textureBarrier(gRefImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
+            encoder->textureBarrier(gResultImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
             encoder->textureBarrier(gIterImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
             for (int i = 0; i < gLearningTextureUAVs.getCount(); i++)
             {
@@ -888,6 +901,43 @@ struct AutoDiffTexture : public WindowedAppBase
             commandBuffer->close();
             gQueue->executeCommandBuffer(commandBuffer);
         }
+
+        {
+            ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
+            auto encoder = commandBuffer->encodeResourceCommands();
+            encoder->textureBarrier(gResultImage, ResourceState::ShaderResource, ResourceState::RenderTarget);
+            encoder->endEncoding();
+            commandBuffer->close();
+            gQueue->executeCommandBuffer(commandBuffer);
+        }
+
+        renderImage(
+            frameBufferIndex,
+            gResultFrameBuffer,
+            [&](IRenderCommandEncoder* encoder)
+            {
+                auto rootObject = encoder->bindPipeline(gRefPipelineState);
+                ShaderCursor rootCursor(rootObject);
+                
+                rootCursor["Uniforms"]["modelViewProjection"].setData(
+                    &transformMatrix, sizeof(float) * 16);
+                rootCursor["Uniforms"]["bwdTexture"]["texture"].setResource(gLearningTextureSRV);
+                rootCursor["Uniforms"]["sampler"].setSampler(gSampler);
+                rootCursor["Uniforms"]["mipOffset"].setData(mipMapOffset.getBuffer(), sizeof(uint32_t) * mipMapOffset.getCount());
+                rootCursor["Uniforms"]["texRef"].setResource(gLearningTextureSRV);
+                rootCursor["Uniforms"]["bwdTexture"]["accumulateBuffer"].setResource(gAccumulateBufferView);
+                rootCursor["Uniforms"]["bwdTexture"]["minLOD"].setData(5.0);
+                
+            });
+
+{
+            ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
+            auto encoder = commandBuffer->encodeResourceCommands();
+            encoder->textureBarrier(gResultImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
+            encoder->endEncoding();
+            commandBuffer->close();
+            gQueue->executeCommandBuffer(commandBuffer);
+        }
         
         // Draw currently learnt texture.
         {
@@ -897,7 +947,7 @@ struct AutoDiffTexture : public WindowedAppBase
             drawTexturedQuad(renderEncoder, 0, 0, textureWidth, textureHeight, gLearningTextureSRV);
             int refImageWidth = windowWidth - textureWidth - 10;
             int refImageHeight = refImageWidth * windowHeight / windowWidth;
-
+            drawTexturedQuad(renderEncoder, 0,textureHeight + 10, refImageWidth, refImageHeight, gResultImageSRV);
             drawTexturedQuad(renderEncoder, textureWidth + 10, 0, refImageWidth, refImageHeight, gRefImageSRV);
             drawTexturedQuad(renderEncoder, textureWidth + 10, refImageHeight + 10, refImageWidth, refImageHeight, gIterImageSRV);
             renderEncoder->endEncoding();
