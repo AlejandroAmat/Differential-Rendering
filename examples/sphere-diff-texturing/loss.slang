@@ -8,7 +8,7 @@ cbuffer Uniforms
     RWTexture2D dstTexture;
     RWTexture2D srcTexture;
     RWTexture2D refTexture; // Reference texture for comparison
-    RWStructuredBuffer<float> loss;
+    RWStructuredBuffer<int> loss;
     int iter;
 }
 
@@ -22,16 +22,7 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID)
     if (y >= dstHeight) return;
     var val = srcTexture[uint2(x, y)];
 
-    dstTexture[uint2(x, y)] = float4((dstTexture[uint2(x, y)] - val * learningRate).xyz, 1.0);
-    if (iter == 0) {
-        var ref = refTexture[uint2(x, y)];
-        var diff = dstTexture[uint2(x, y)].xyz - ref.xyz;
-        var fdiff = dot(diff, diff);
-        loss[((y *dstWidth + x))] = fdiff;
+    if ((loss[0] / (516 * 216))< -1000000) dstTexture[uint2(x, y)] = (0, 0, 0, 0);
 
-        
 
-        
-        
-    }
 }

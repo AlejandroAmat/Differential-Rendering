@@ -84,7 +84,7 @@ struct DifferentiableTexture
         // uint lod0 = (uint)floor(clampedLOD);
         // uint lod1 = min(levels - 1, lod0 + 1);
         uint lod0 = 0;
-        uint lod1 = 2;
+        uint lod1 = 0;
         float weightLod0 = 1.0 - lodFrac;
         float weightLod1 = lodFrac;
 
@@ -150,7 +150,7 @@ float4 shadeFragment(float2 uv)
     // Compute fragment differentials using shader intrinsics.
     float2 dX = no_diff ddx_coarse(uv);
     float2 dY = no_diff ddy_coarse(uv);
-    //printf("aa");
+    
     float3 color = DifferentiableTexture.sample(bwdTexture, sampler, uv, dX, dY).xyz;
      return float4(color, 0.1);
     

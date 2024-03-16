@@ -40,7 +40,7 @@ static Vertex kVertexDataQuad[kVertexCountQuad]={
 };
 
 
-
+std::chrono::time_point<std::chrono::high_resolution_clock> start;
 
 struct AutoDiffTexture : public WindowedAppBase
 {
@@ -183,6 +183,7 @@ struct AutoDiffTexture : public WindowedAppBase
     ComPtr<gfx::IPipelineState> gBuildMipPipelineState;
     ComPtr<gfx::IPipelineState> gLearnMipPipelineState;
     ComPtr<gfx::IPipelineState> gDrawQuadPipelineState;
+    ComPtr<gfx::IPipelineState> gLossPipeline;
 
     //ItextureResource
     //...................................................................................................................
@@ -244,10 +245,12 @@ struct AutoDiffTexture : public WindowedAppBase
     ComPtr<gfx::IResourceView> gResultImageRTV;
 
     ComPtr<gfx::IBufferResource> gAccumulateBuffer;
-    ComPtr<gfx::IBufferResource> gReconstructBuffer;
     ComPtr<gfx::IBufferResource> gLossBuffer;
+    ComPtr<gfx::IBufferResource> gReconstructBuffer;
+    ComPtr<gfx::IBufferResource> cpuReadableBuffer;
     ComPtr<gfx::IResourceView> gAccumulateBufferView;
     ComPtr<gfx::IResourceView> gReconstructBufferView;
+    ComPtr<gfx::IResourceView> gLossBufferView;
 
     ClearValue kClearValue;   // Color value used to restore the learnt Texture UAV
     bool resetLearntTexture = false;
@@ -390,8 +393,9 @@ struct AutoDiffTexture : public WindowedAppBase
         initializeBase("autodiff-texture", 1024, 768);
         srand(20421);
 
+        start = std::chrono::high_resolution_clock::now();
         freopen("output.txt", "a", stdout);
-        
+        printf("llega");
         float radius = 0.5;
         float x,y,z,xy;
         static Vertex vertices[40401];
@@ -565,6 +569,11 @@ struct AutoDiffTexture : public WindowedAppBase
             SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "learnmip", shaderProgram.writeRef()));
             gLearnMipPipelineState = createComputePipelineState(shaderProgram);
         }
+        {
+            ComPtr<IShaderProgram> shaderProgram;
+            SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "loss", shaderProgram.writeRef()));
+            gLossPipeline = createComputePipelineState(shaderProgram);
+        }
 
         //create the Reference Texture View and create MipMapOffsets (Check function)
         gTexView = createTextureFromFile("ee.jpg", textureWidth, textureHeight);
@@ -584,9 +593,32 @@ struct AutoDiffTexture : public WindowedAppBase
         gAccumulateBuffer = gDevice->createBufferResource(bufferDesc);
         gReconstructBuffer = gDevice->createBufferResource(bufferDesc);
 
-        //Create Unordered Acces View of Buffers in order to update them in different pipelines
+         //Create Unordered Acces View of Buffers in order to update them in different pipelines
         gAccumulateBufferView = createUAV(gAccumulateBuffer);
         gReconstructBufferView = createUAV(gReconstructBuffer);
+
+        gfx::IBufferResource::Desc bufferDescLoss = {};
+        bufferDescLoss.allowedStates.add(ResourceState::UnorderedAccess);
+        bufferDescLoss.allowedStates.add(ResourceState::CopySource);
+        bufferDescLoss.sizeInBytes = sizeof(float)*512*256;
+        
+        bufferDescLoss.type = IResource::Type::Buffer;
+        gLossBuffer = gDevice->createBufferResource(bufferDescLoss);
+
+        gLossBufferView = createUAV(gLossBuffer);
+        
+
+        gfx::IBufferResource::Desc cpuBufferDesc = {};
+        cpuBufferDesc.allowedStates.add(ResourceState::CopyDestination);
+        cpuBufferDesc.defaultState= ResourceState::CopyDestination;
+        cpuBufferDesc.sizeInBytes = sizeof(float)*textureHeight*textureWidth; // Assuming you're storing a single float for loss
+        cpuBufferDesc.format = gfx::Format::R32_FLOAT;
+        cpuBufferDesc.type = IResource::Type::Buffer;
+        cpuBufferDesc.memoryType = gfx::MemoryType::ReadBack; // Or equivalent in your API
+        cpuReadableBuffer = gDevice->createBufferResource(cpuBufferDesc);
+        
+        
+        
 
         //create Learning and DiffTexture. Learning TExture is the texture that will be updated 
         //every frame and thaat we try to estimate. DiffTExture is an auxiliary Texture that stores 
@@ -795,10 +827,12 @@ struct AutoDiffTexture : public WindowedAppBase
             ClearValue clearValue = {};
             resEncoder->bufferBarrier(gAccumulateBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
             resEncoder->bufferBarrier(gReconstructBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
+            resEncoder->bufferBarrier(gLossBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
             resEncoder->textureBarrier(gRefImage, ResourceState::Present, ResourceState::ShaderResource);
             resEncoder->textureBarrier(gIterImage, ResourceState::ShaderResource, ResourceState::RenderTarget);
             resEncoder->clearResourceView(gAccumulateBufferView, &clearValue, ClearResourceViewFlags::None);
             resEncoder->clearResourceView(gReconstructBufferView, &clearValue, ClearResourceViewFlags::None);
+        //    resEncoder->clearResourceView(gLossBufferView, &clearValue, ClearResourceViewFlags::None);
             if (resetLearntTexture)
             {
                 resEncoder->textureBarrier(gLearningTexture, ResourceState::ShaderResource, ResourceState::UnorderedAccess);
@@ -832,6 +866,9 @@ struct AutoDiffTexture : public WindowedAppBase
                 
             });
 
+
+         
+        
         // Propagete gradients through mip map layers from top (lowest res) to bottom (highest res).
         {
             ComPtr<ICommandBuffer> commandBuffer =
@@ -854,6 +891,7 @@ struct AutoDiffTexture : public WindowedAppBase
                 encoder->bufferBarrier(gReconstructBuffer, ResourceState::UnorderedAccess, ResourceState::UnorderedAccess);
             }
 
+            
             // Convert bottom layer mip from buffer to texture.
             rootObject = encoder->bindPipeline(gConvertPipelineState);
             ShaderCursor rootCursor(rootObject);
@@ -888,12 +926,39 @@ struct AutoDiffTexture : public WindowedAppBase
                 ShaderCursor rootCursor(rootObject);
                 rootCursor["Uniforms"]["dstWidth"].setData(textureWidth >> i);
                 rootCursor["Uniforms"]["dstHeight"].setData(textureHeight >> i);
-                rootCursor["Uniforms"]["learningRate"].setData(0.1f);
+                rootCursor["Uniforms"]["learningRate"].setData(0.28f);
                 rootCursor["Uniforms"]["srcTexture"].setResource(gDiffTextureUAVs[i]);
                 rootCursor["Uniforms"]["dstTexture"].setResource(gLearningTextureUAVs[i]);
+                rootCursor["Uniforms"]["refTexture"].setResource(gTexView);
+                rootCursor["Uniforms"]["iter"].setData(i);
+                rootCursor["Uniforms"]["loss"].setResource(gLossBufferView);
                 encoder->dispatchCompute(
                     ((textureWidth >> i) + 15) / 16, ((textureHeight >> i) + 15) / 16, 1);
             }
+
+
+            /*rootObject = encoder->bindPipeline(gLossPipeline);
+            
+                ShaderCursor rootCursore(rootObject);
+                rootCursore["Uniforms"]["dstWidth"].setData(textureWidth );
+                rootCursore["Uniforms"]["dstHeight"].setData(textureHeight);
+                rootCursore["Uniforms"]["learningRate"].setData(0.28f);
+                rootCursore["Uniforms"]["srcTexture"].setResource(gDiffTextureUAVs[0]);
+                rootCursore["Uniforms"]["dstTexture"].setResource(gLearningTextureUAVs[0]);
+                rootCursore["Uniforms"]["refTexture"].setResource(gTexView);
+                rootCursore["Uniforms"]["iter"].setData(0);
+                rootCursore["Uniforms"]["loss"].setResource(gLossBufferView);
+                encoder->dispatchCompute(
+                (textureWidth + 15) / 16, (textureHeight + 15) / 16, 1);
+                
+            */
+
+
+
+
+
+
+
             encoder->textureBarrier(gLearningTexture, ResourceState::UnorderedAccess, ResourceState::ShaderResource);
             encoder->textureBarrier(gIterImage, ResourceState::Present, ResourceState::ShaderResource);
 
@@ -901,6 +966,14 @@ struct AutoDiffTexture : public WindowedAppBase
             commandBuffer->close();
             gQueue->executeCommandBuffer(commandBuffer);
         }
+
+
+      
+
+        
+    
+       
+
 
         {
             ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
@@ -929,8 +1002,9 @@ struct AutoDiffTexture : public WindowedAppBase
                 rootCursor["Uniforms"]["bwdTexture"]["minLOD"].setData(5.0);
                 
             });
+            
 
-{
+        {
             ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
             auto encoder = commandBuffer->encodeResourceCommands();
             encoder->textureBarrier(gResultImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
@@ -947,7 +1021,7 @@ struct AutoDiffTexture : public WindowedAppBase
             drawTexturedQuad(renderEncoder, 0, 0, textureWidth, textureHeight, gLearningTextureSRV);
             int refImageWidth = windowWidth - textureWidth - 10;
             int refImageHeight = refImageWidth * windowHeight / windowWidth;
-            drawTexturedQuad(renderEncoder, 0,textureHeight + 10, refImageWidth, refImageHeight, gResultImageSRV);
+            drawTexturedQuad(renderEncoder, 10, refImageHeight + 10, refImageWidth, refImageHeight, gResultImageSRV);
             drawTexturedQuad(renderEncoder, textureWidth + 10, 0, refImageWidth, refImageHeight, gRefImageSRV);
             drawTexturedQuad(renderEncoder, textureWidth + 10, refImageHeight + 10, refImageWidth, refImageHeight, gIterImageSRV);
             renderEncoder->endEncoding();
@@ -956,6 +1030,47 @@ struct AutoDiffTexture : public WindowedAppBase
         }
 
         gSwapchain->present();
+
+
+       {
+
+            gQueue->waitOnHost();
+            std::vector<float> outLossValues;
+            const size_t bufferSize = gLossBuffer->getDesc()->sizeInBytes;
+            ComPtr<ISlangBlob> blob;
+
+            // Read the buffer contents into a blob
+            gDevice->readBufferResource(gLossBuffer, 0, bufferSize, blob.writeRef());
+            if (!blob)
+                printf("BAD");
+
+            // Cast the blob data to the type stored in the buffer, in this case, let's assume it's float
+            const float* lossData = (const float*)blob->getBufferPointer();
+            size_t lossCount = bufferSize / sizeof(float);
+
+            // Copy the loss values into the output vector
+            outLossValues.assign(lossData, lossData + lossCount);
+            float totalLoss =0;
+            
+            for(int k=0; k<lossCount; k++){
+                totalLoss = totalLoss + outLossValues[k];
+            }
+             totalLoss = totalLoss/(512*256);
+
+             if(totalLoss<0.023) 
+             {
+                    auto stop = std::chrono::high_resolution_clock::now();
+                    // Calculate the duration
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+                    // Output the time taken
+                    std::cout << "Time taken: " << duration.count() << " milliseconds. Loss:" << totalLoss << std::endl;
+             }
+            
+        }
+
+
+
+
     }
 
     void drawTexturedQuad(IRenderCommandEncoder* renderEncoder, int x, int y, int w, int h, IResourceView* srv)
