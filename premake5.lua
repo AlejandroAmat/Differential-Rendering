@@ -853,7 +853,8 @@ example "hello-world"
 
 example "sphere-diff-texturing"
 example "sphere-texture"
-
+example "pose-cube"
+example "pose-cube-diff"
 if enableAftermath then
     example "nv-aftermath-example"
         filter {}
