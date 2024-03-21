@@ -608,15 +608,7 @@ struct AutoDiffTexture : public WindowedAppBase
         gLossBufferView = createUAV(gLossBuffer);
         
 
-        gfx::IBufferResource::Desc cpuBufferDesc = {};
-        cpuBufferDesc.allowedStates.add(ResourceState::CopyDestination);
-        cpuBufferDesc.defaultState= ResourceState::CopyDestination;
-        cpuBufferDesc.sizeInBytes = sizeof(float)*textureHeight*textureWidth; // Assuming you're storing a single float for loss
-        cpuBufferDesc.format = gfx::Format::R32_FLOAT;
-        cpuBufferDesc.type = IResource::Type::Buffer;
-        cpuBufferDesc.memoryType = gfx::MemoryType::ReadBack; // Or equivalent in your API
-        cpuReadableBuffer = gDevice->createBufferResource(cpuBufferDesc);
-        
+    
         
         
 

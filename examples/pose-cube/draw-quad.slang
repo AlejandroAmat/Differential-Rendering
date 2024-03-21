@@ -8,14 +8,12 @@ cbuffer Uniforms
     int height;
     int viewWidth;
     int viewHeight;
-    Texture2D texture;
-    SamplerState sampler;
+    
 }
 
 struct AssembledVertex
 {
     float3 position : POSITION;
-    
     float4 color : COLOR;
 };
 
@@ -26,7 +24,7 @@ struct Fragment
 
 struct VertexStageOutput
 {
-    float2 uv : UV;
+    float4 color : COLOR;
     float4          sv_position     : SV_Position;
 };
 
@@ -38,7 +36,7 @@ VertexStageOutput vertexMain(
 
     float3 position = assembledVertex.position;
 
-    output.uv = position.xy;
+    output.color = assembledVertex.color;
     output.sv_position.x = (x + position.x * width) / (float)viewWidth * 2.0f - 1.0f;
     output.sv_position.y = -((y + position.y * height) / (float)viewHeight * 2.0f - 1.0f);
     output.sv_position.z = 0;
@@ -48,7 +46,7 @@ VertexStageOutput vertexMain(
 
 [shader("fragment")]
 float4 fragmentMain(
-    float2 uv : UV) : SV_Target
+    float4 color : COLOR) : SV_Target
 {
-    return float4(texture.Sample(sampler, uv).xyz, 1.0);
+    return color;
 }
