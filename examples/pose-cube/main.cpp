@@ -39,9 +39,11 @@
 #include "source/core/slang-basic.h"
 #include "examples/example-base/example-base.h"
 #include "tools/platform/vector-math.h"
+#include "Tensor.h"
 
 using namespace gfx;
 using namespace Slang;
+
 struct Vertex
 {
     float position[3];
@@ -55,9 +57,11 @@ static Vertex kVertexDataQuad[kVertexCountQuad]={
     {{1, 1, 0},{0,0,0,1}},
 };
 
+
 float initialParameters[2] = {0, 0}; // Example initial data
 float initialInertia[2] = {0, 0};
-
+Tensor myTensor2;
+Tensor myTensor;
 
 int dimensions =2;
 
@@ -200,6 +204,16 @@ ComPtr<gfx::IResourceView> gMtBufferView;
 ComPtr<gfx::IResourceView> gVtBufferView;
 
 
+ComPtr<gfx::IBufferResource> TensorBuffer;
+ComPtr<gfx::IResourceView> TensorResource;
+ComPtr<gfx::IBufferResource> StrideBuffer;
+ComPtr<gfx::IResourceView> StrideResource;
+ComPtr<gfx::IBufferResource> ShapeBuffer;
+ComPtr<gfx::IResourceView> ShapeResource;
+
+ComPtr<gfx::IBufferResource> TensorABuffer;
+ComPtr<gfx::IResourceView> TensorAResource;
+
 
 int frames =0;
 
@@ -233,10 +247,34 @@ ComPtr<gfx::IResourceView> createUAV(IBufferResource* buffer)
 
 Slang::Result initialize()
 {
+    
+    
    
     freopen("output.txt", "a", stdout);
     initializeBase("PoseDiff", 1024, 768);
+    
 
+   
+   // if(value>2)
+    // Get and print values from the tensor.
+    std::vector<size_t> shape = { 10, 10 };
+    size_t dtypeSize = sizeof(float);
+    Tensor myTensorloc (shape
+        , dtypeSize);
+    myTensor = std::move(myTensorloc);
+     // Initialize all elements of myTensorloc to 0
+    for (size_t i = 0; i < shape[0]; ++i) {
+        for (size_t j = 0; j < shape[1]; ++j) {
+            for (size_t k = 0; k < shape[2]; ++k) {
+                myTensor.setValue<float>({i, j, k}, 5.0f);
+            }
+        }
+    }   
+
+    auto strides = myTensor.getStrides();
+    
+    
+       // Use std::move to transfer ownership of tensors
 
     InputElementDesc inputElements[] = {
         { "POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position) },
@@ -259,7 +297,7 @@ Slang::Result initialize()
     gMtBuffer = gDevice->createBufferResource(bufferDescM,&initialInertia);
     gMtBufferView = createUAV(gMtBuffer);
 
-   gfx::IBufferResource::Desc bufferDescV = {};
+    gfx::IBufferResource::Desc bufferDescV = {};
     bufferDescV.allowedStates.add(ResourceState::UnorderedAccess);
     bufferDescV.allowedStates.add(ResourceState::CopySource);
     bufferDescV.sizeInBytes = sizeof(float)*dimensions;
@@ -267,10 +305,39 @@ Slang::Result initialize()
     gVtBuffer = gDevice->createBufferResource(bufferDescV,&initialInertia);
     gVtBufferView = createUAV(gVtBuffer);
 
+    gfx::IBufferResource::Desc TensorResourceDes = {};
+    TensorResourceDes.allowedStates.add(ResourceState::UnorderedAccess);
+    TensorResourceDes.allowedStates.add(ResourceState::CopySource);
+    TensorResourceDes.sizeInBytes =   std::accumulate(shape.begin(), shape.end(), 1,
+                                   std::multiplies<size_t>()) * dtypeSize;
+    TensorResourceDes.type = IResource::Type::Buffer;
+    TensorBuffer = gDevice->createBufferResource(TensorResourceDes,myTensor.getDataPointer());
+    TensorResource = createUAV(TensorBuffer);
+
+    
+    TensorABuffer = gDevice->createBufferResource(TensorResourceDes);
+    TensorAResource = createUAV(TensorABuffer);
+
+    gfx::IBufferResource::Desc StrideDesc = {};
+    StrideDesc.allowedStates.add(ResourceState::UnorderedAccess);
+    StrideDesc.allowedStates.add(ResourceState::CopySource);
+    StrideDesc.sizeInBytes = sizeof(size_t)*shape.size();
+    StrideDesc.type = IResource::Type::Buffer;
+    StrideBuffer = gDevice->createBufferResource(StrideDesc, strides.data());
+    StrideResource = createUAV(StrideBuffer);
+
+
+    gfx::IBufferResource::Desc ShapeDesc = {};
+        ShapeDesc.allowedStates.add(ResourceState::UnorderedAccess);
+        ShapeDesc.allowedStates.add(ResourceState::CopySource);
+        ShapeDesc.sizeInBytes = sizeof(size_t)*shape.size();
+        ShapeDesc.type = IResource::Type::Buffer;
+        ShapeBuffer = gDevice->createBufferResource(ShapeDesc, shape.data());
+        ShapeResource = createUAV(ShapeBuffer);
 
     {       
         ComPtr<IShaderProgram> shaderProgram;
-        SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "ADAM", shaderProgram.writeRef()));
+        SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "test", shaderProgram.writeRef()));
         gLossPipeline = createComputePipelineState(shaderProgram);
     }
   
@@ -278,9 +345,9 @@ Slang::Result initialize()
 
 
 virtual void renderFrame(int frameBufferIndex) override
-{       
-
-    {
+{
+    
+    /*{
         ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
         auto resEncoder = commandBuffer->encodeResourceCommands();
         resEncoder->bufferBarrier(gParametersBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
@@ -310,6 +377,36 @@ virtual void renderFrame(int frameBufferIndex) override
             gQueue->executeCommandBuffer(commandBuffer);
                 
     }
+    */
+    {
+        ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
+        auto resEncoder = commandBuffer->encodeResourceCommands();
+        resEncoder->bufferBarrier(TensorBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
+        resEncoder->bufferBarrier(StrideBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
+        resEncoder->bufferBarrier(ShapeBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
+        resEncoder->bufferBarrier(TensorABuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
+        resEncoder->endEncoding();
+        commandBuffer->close();
+        gQueue->executeCommandBuffer(commandBuffer);
+    }
+    {
+    ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
+            auto encoder = commandBuffer->encodeComputeCommands();
+            auto rootObject = encoder->bindPipeline(gLossPipeline);
+            ShaderCursor rootCursor(rootObject);
+            rootCursor["Uniforms"]["dim"].setData(3);
+            rootCursor["Uniforms"]["tensor"].setResource(TensorResource);
+            rootCursor["Uniforms"]["strides"].setResource(StrideResource);
+            rootCursor["Uniforms"]["shape"].setResource(ShapeResource);
+            rootCursor["Uniforms"]["result"].setResource(TensorAResource);
+            encoder->dispatchCompute(
+                    1, 1, 1);
+            encoder->endEncoding();
+            commandBuffer->close();
+            gQueue->executeCommandBuffer(commandBuffer);
+                
+    }
+    
 
     
     gSwapchain->present();
@@ -317,11 +414,11 @@ virtual void renderFrame(int frameBufferIndex) override
 
     gQueue->waitOnHost();
     std::vector<float> params;
-    const size_t bufferSize = gParametersBuffer->getDesc()->sizeInBytes;
+    const size_t bufferSize = TensorABuffer->getDesc()->sizeInBytes;
     ComPtr<ISlangBlob> blob;
 
     // Read the buffer contents into a blob
-    gDevice->readBufferResource(gParametersBuffer, 0, bufferSize, blob.writeRef());
+    gDevice->readBufferResource(TensorABuffer, 0, bufferSize, blob.writeRef());
     if (!blob)
         printf("BAD");
 
@@ -335,7 +432,7 @@ virtual void renderFrame(int frameBufferIndex) override
                 printf(" %f:: %d \n", params[k], frames);
     }
 
-    printf("\n");
+    //printf("\n");
 frames++;
 
     

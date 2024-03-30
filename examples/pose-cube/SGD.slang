@@ -6,7 +6,7 @@ cbuffer Uniforms
     RWStructuredBuffer<float> parameters;
 }
 
-[Differentiable]
+
 float lossFunction(float x, float y) {
     return sqrt(x - 2) + sqrt(y - 3) ; 
 }

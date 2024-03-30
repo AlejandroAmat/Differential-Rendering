@@ -10,7 +10,7 @@ cbuffer Uniforms
     uint iteration; // Keep track of the iteration for bias correction
 }
 
-[Differentiable]
+[BackwardDifferentiable]
 float lossFunction(float x, float y) {
     return (x - 2) * (x - 2) + (y - 3) * (y - 3);
 }
