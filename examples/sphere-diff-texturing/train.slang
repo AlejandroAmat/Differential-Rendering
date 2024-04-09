@@ -143,16 +143,16 @@ struct VertexStageOutput
 };
 
 [BackwardDifferentiable]
-float4 shadeFragment(float2 uv)
+float3 shadeFragment(no_diff float2 uv)
 {
     uv = uv;
 
     // Compute fragment differentials using shader intrinsics.
     float2 dX = no_diff ddx_coarse(uv);
     float2 dY = no_diff ddy_coarse(uv);
-    
+
     float3 color = DifferentiableTexture.sample(bwdTexture, sampler, uv, dX, dY).xyz;
-     return float4(color, 0.1);
+    return color;
     
 }
 
@@ -163,7 +163,7 @@ float3 loss(no_diff float2 uv, no_diff float4 screenPos)
     float3 rs = shadeFragment(uv).xyz - refColor;
     rs *= rs;
     return rs;
-}
+} 
 
 [shader("vertex")]
 VertexStageOutput vertexMain(
@@ -186,14 +186,14 @@ float3 sqr(float3 v) { return v * v; }
 float4 fragmentMain(
     float2 uv : UV) : SV_Target
 {
-    return shadeFragment(uv);
+    return float4(shadeFragment(uv),0.1);
 }
 
 [shader("fragment")]
-float4 diffFragmentMain(
+float4 diffFragmentMain(  
     float2 uv : UV,
     float4 screenPos : SV_POSITION) : SV_Target
 {
-    __bwd_diff(loss)(uv, screenPos , float3(1.0));
+    __bwd_diff(shadeFragment)(uv, float3(1.0));
     return float4(loss(uv, screenPos), 1.0);
 }

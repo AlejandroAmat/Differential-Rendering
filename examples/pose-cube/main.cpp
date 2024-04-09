@@ -156,6 +156,7 @@ gfx::Result loadRenderProgram(
 
             return SLANG_OK;
         }
+        
 gfx::Result loadComputeProgram(
         gfx::IDevice* device, const char* fileName, gfx::IShaderProgram** outProgram)
     {
@@ -257,7 +258,7 @@ Slang::Result initialize()
    
    // if(value>2)
     // Get and print values from the tensor.
-    std::vector<size_t> shape = { 10, 10 };
+    std::vector<size_t> shape = { 200, 200 };
     size_t dtypeSize = sizeof(float);
     Tensor myTensorloc (shape
         , dtypeSize);
@@ -265,12 +266,11 @@ Slang::Result initialize()
      // Initialize all elements of myTensorloc to 0
     for (size_t i = 0; i < shape[0]; ++i) {
         for (size_t j = 0; j < shape[1]; ++j) {
-            for (size_t k = 0; k < shape[2]; ++k) {
-                myTensor.setValue<float>({i, j, k}, 5.0f);
-            }
+                myTensor.setValue<float>({i, j}, 5.0f);
         }
     }   
-
+    
+    printf("%f, %f", myTensor.getValue<float>({2, 2}),myTensor.getValue<float>({4, 2}) );
     auto strides = myTensor.getStrides();
     
     
@@ -337,7 +337,7 @@ Slang::Result initialize()
 
     {       
         ComPtr<IShaderProgram> shaderProgram;
-        SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "test", shaderProgram.writeRef()));
+        SLANG_RETURN_ON_FAIL(loadComputeProgram(gDevice, "mult_float_2x2", shaderProgram.writeRef()));
         gLossPipeline = createComputePipelineState(shaderProgram);
     }
   
@@ -346,8 +346,8 @@ Slang::Result initialize()
 
 virtual void renderFrame(int frameBufferIndex) override
 {
-    
-    /*{
+    /*
+    {
         ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
         auto resEncoder = commandBuffer->encodeResourceCommands();
         resEncoder->bufferBarrier(gParametersBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
@@ -377,7 +377,10 @@ virtual void renderFrame(int frameBufferIndex) override
             gQueue->executeCommandBuffer(commandBuffer);
                 
     }
+    
     */
+   
+    
     {
         ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
         auto resEncoder = commandBuffer->encodeResourceCommands();
@@ -394,18 +397,21 @@ virtual void renderFrame(int frameBufferIndex) override
             auto encoder = commandBuffer->encodeComputeCommands();
             auto rootObject = encoder->bindPipeline(gLossPipeline);
             ShaderCursor rootCursor(rootObject);
-            rootCursor["Uniforms"]["dim"].setData(3);
+            rootCursor["Uniforms"]["dim"].setData(2);
             rootCursor["Uniforms"]["tensor"].setResource(TensorResource);
             rootCursor["Uniforms"]["strides"].setResource(StrideResource);
             rootCursor["Uniforms"]["shape"].setResource(ShapeResource);
             rootCursor["Uniforms"]["result"].setResource(TensorAResource);
             encoder->dispatchCompute(
-                    1, 1, 1);
+                    200/16 + 1, 200/16 + 1, 1);
             encoder->endEncoding();
             commandBuffer->close();
             gQueue->executeCommandBuffer(commandBuffer);
                 
     }
+    
+    
+
     
 
     

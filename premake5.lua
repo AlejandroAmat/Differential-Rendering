@@ -856,6 +856,9 @@ example "sphere-texture"
 example "pose-cube"
     includedirs {"examples/pose-cube/"}
 example "pose-cube-diff"
+example "2dgs"
+
+
 if enableAftermath then
     example "nv-aftermath-example"
         filter {}
