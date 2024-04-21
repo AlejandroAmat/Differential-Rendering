@@ -538,8 +538,8 @@ Slang::Result initialize()
 
 glm::mat4x4 getMatrix (){
     glm::vec3 cameraPosition = glm::vec3(3, 4.3f, 3);
-    float angleY = glm::radians(rand()/(float)RAND_MAX*180); // 90 grados hacia la izquierda
-    float angleX = glm::radians(-1 * rand()/(float)RAND_MAX*90); // 45 grados hacia abajo
+    float angleY = glm::radians(rand()/(float)RAND_MAX*120); // 90 grados hacia la izquierda
+    float angleX = glm::radians(-1 * rand()/(float)RAND_MAX*50); // 45 grados hacia abajo
 
     // Crear cuaterniones de rotación para cada eje
     glm::quat rotationY = glm::angleAxis(angleY, glm::vec3(0, 1, 0)); // Rotación alrededor del eje Y

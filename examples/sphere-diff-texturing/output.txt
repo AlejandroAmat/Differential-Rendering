@@ -4035,3 +4035,6 @@ Time taken: 45825 milliseconds. Loss:0.0143039
 Time taken: 45842 milliseconds. Loss:0.0143577
 Time taken: 45860 milliseconds. Loss:0.0144125
 Time taken: 45875 milliseconds. Loss:0.014445
+(0): error 1: cannot open file 'shaders.slang'.
+(0): error 1: cannot open file 'shaders.slang'.
+llega
