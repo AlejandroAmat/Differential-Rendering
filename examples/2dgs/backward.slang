@@ -83,9 +83,9 @@ cbuffer Uniforms
 void write_grad(uint offset, float value)
 {
 
-    //float sum = WaveActiveSum(value);
-    //if (WaveIsFirstLane())
-       InterlockedAdd(grad_blobs[offset], int(value*65336));
+    float sum = WaveActiveSum(value);
+    if (WaveIsFirstLane())
+       InterlockedAdd(grad_blobs[offset], int(sum*65336));
     
 
    // InterlockedAdd(grad_blobs[0], int(sum));
@@ -120,8 +120,14 @@ void computeMain(uint3 threadIdx: SV_DispatchThreadID)
       
         bwd_diff(eval)(pos, d_blob,d_image);
      
-        write_grad(i * 2, d_blob.d.pos.x);
-        write_grad(i * 2 + 1, d_blob.d.pos.y);
+        write_grad(i * 8, d_blob.d.pos.x);
+        write_grad(i * 8 + 1, d_blob.d.pos.y);
+        write_grad(i * 8 + 2, d_blob.d.scale.x);
+        write_grad(i * 8 + 3, d_blob.d.scale.y);
+        write_grad(i * 8 + 4, d_blob.d.color.r);
+        write_grad(i * 8 + 5, d_blob.d.color.g);
+        write_grad(i * 8 + 6, d_blob.d.color.b);
+        write_grad(i * 8 + 7, d_blob.d.rotation);
 
 
         

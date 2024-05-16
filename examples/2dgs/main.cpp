@@ -238,6 +238,10 @@ ComPtr<gfx::IPipelineState> gDrawQuadPipelineState;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
 ComPtr<gfx::IBufferResource> gVertexBufferQuad;
 
+ComPtr<gfx::IBufferResource> gMtBuffer;
+ComPtr<gfx::IBufferResource> gVtBuffer;
+ComPtr<gfx::IResourceView> gMtBufferView;
+ComPtr<gfx::IResourceView> gVtBufferView;
 
 ComPtr<gfx::ISamplerState> gSampler;
 
@@ -477,7 +481,7 @@ Slang::Result initialize()
     bufferDescb.allowedStates.add(ResourceState::ShaderResource);
     bufferDescb.allowedStates.add(ResourceState::UnorderedAccess);
     bufferDescb.allowedStates.add(ResourceState::General);
-    bufferDescb.sizeInBytes = BLOB_COUNT * sizeof (int)*2; 
+    bufferDescb.sizeInBytes = BLOB_COUNT * sizeof (int)*8; 
     bufferDescb.type = IResource::Type::Buffer ;
     BlobsGradientBuffer = gDevice->createBufferResource(bufferDescb);
     BlobsGradientBufferView = createUAV(BlobsGradientBuffer);
@@ -500,6 +504,22 @@ Slang::Result initialize()
     bufferDescbe.type = IResource::Type::Buffer ;
     GradientBuffer = gDevice->createBufferResource(bufferDescbe);
     GradientBufferView = createUAV(GradientBuffer);
+
+    gfx::IBufferResource::Desc bufferDescM = {};
+    bufferDescM.allowedStates.add(ResourceState::UnorderedAccess);
+    bufferDescM.allowedStates.add(ResourceState::CopySource);
+    bufferDescM.sizeInBytes = sizeof(float)*8*BLOB_COUNT;
+    bufferDescM.type = IResource::Type::Buffer;
+    gMtBuffer = gDevice->createBufferResource(bufferDescM);
+    gMtBufferView = createUAV(gMtBuffer);
+
+    gfx::IBufferResource::Desc bufferDescV = {};
+    bufferDescV.allowedStates.add(ResourceState::UnorderedAccess);
+    bufferDescV.allowedStates.add(ResourceState::CopySource);
+    bufferDescV.sizeInBytes = sizeof(float)*8*BLOB_COUNT;
+    bufferDescV.type = IResource::Type::Buffer;
+    gVtBuffer = gDevice->createBufferResource(bufferDescV);
+    gVtBufferView = createUAV(gVtBuffer);
         //Create Unordered Acces View of Buffers in order to update them in different pipelines
    
     
@@ -798,7 +818,7 @@ virtual void renderFrame(int frameBufferIndex) override
             }
 
     
-    {
+   /**/ {
                 ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
                 auto encoder = commandBuffer->encodeComputeCommands();
             
@@ -818,6 +838,12 @@ virtual void renderFrame(int frameBufferIndex) override
                 rootCursor["Uniforms"]["blob_count"].setData(BLOB_COUNT);
                 rootCursor["Uniforms"]["result"].setResource(ResultResource);
                 rootCursor["Uniforms"]["grad_blobs"].setResource(BlobsGradientBufferView);
+                rootCursor["Uniforms"]["beta1"].setData(0.9f);
+                rootCursor["Uniforms"]["beta2"].setData(0.999f);
+                rootCursor["Uniforms"]["epsilon"].setData(1e-8);
+                rootCursor["Uniforms"]["m"].setResource(gMtBufferView);
+                rootCursor["Uniforms"]["v"].setResource(gVtBufferView);
+                rootCursor["Uniforms"]["iteration"].setData(frame+1);
                 
             
             encoder->dispatchCompute(
