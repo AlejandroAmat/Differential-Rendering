@@ -1,2 +1,4 @@
 s=1s=200Succesfull Malloc 160000 bitsMemory allocated for tensor at address: 000002555EF39350
 5.000000, 5.000000(0): error 1: cannot open file 'mult-float-2x2.slang'.
+s=1s=200Succesfull Malloc 160000 bitsMemory allocated for tensor at address: 000001FA3FEE8EB0
+5.000000, 5.000000(0): error 1: cannot open file 'mult-float-2x2.slang'.

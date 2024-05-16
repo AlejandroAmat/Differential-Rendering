@@ -50,10 +50,12 @@ float gaussian(float2 x, float2x2 sigma)
 
 
 float3 eval(no_diff float2 pos, Blob blob) {
+    float3 color = sigmoid(blob.color); // Apply sigmoid to color
+    float2 scale = exp(blob.scale);
     float2x2 R = rotation_matrix(blob.rotation);
-    float2x2 S = scale_matrix(max(blob.scale, 0.001));
+    float2x2 S = scale_matrix(max(scale, 0.001));
     float2x2 sigma = mul(mul(R, S), mul(transpose(S), transpose(R)));
-    return gaussian(pos - blob.pos, sigma) * blob.color;
+    return gaussian(pos - blob.pos, sigma) * color;
 }
 
 // Uniform data to be passed from application -> shader.
@@ -92,13 +94,16 @@ struct Fragment
     float4 color;
 };
 
+float3 sigmoid(float3 x) {
+    return 1.0 / (1.0 + exp(-x));
+}
 
 
 float3 gs2d(float2 pos) {
     float3 color = float3(0);
-    for (uint i = 0; i < blob_count; ++i) {
-        if (kSkipDistance > 0 && distance(pos, blobs[i].pos) > kSkipDistance)
-             continue;
+    for (uint i = 0; i < blob_count-1; ++i) {
+      //  if (kSkipDistance > 0 && distance(pos, blobs[i-1].pos) > kSkipDistance)
+        //  continue;
         color += eval(pos, blobs[i]);
     }
     return color;
@@ -108,9 +113,10 @@ float3 gs2d(float2 pos) {
 [BackwardDifferentiable]
 float3 loss(no_diff float2 screenPos, float3 screenColor)
 {
+    float3 ref;
     float3 refColor = (no_diff texRef.Load(int3(int2(screenPos), 0))).xyz;
-    float3 rs = screenColor - refColor;
-    rs *= rs;
+
+    float3 rs = abs(refColor-screenColor);
     return rs;
 }
 
@@ -146,7 +152,8 @@ float4 fragmentMain(
     CoarseVertex coarseVertex: CoarseVertex,
     float4 pos: SV_Position) : SV_Target
 {
-    return float4(gs2d(pos.xy),1);
+    return float4(gs2d(pos.xy/viewHeight),1);
+    
 }
 
 
@@ -156,16 +163,16 @@ float4 fragmentDiffMain(
     float4 pos : SV_Position) : SV_Target
 {
 
-     DifferentialPair<float3> screenColor = diffPair(gs2d(pos.xy));
-     bwd_diff(loss)(pos.xy, screenColor, 1);
+    DifferentialPair<float3> screenColor = diffPair(gs2d(pos.xy / viewHeight),0);
+    bwd_diff(loss)(pos.xy, screenColor, float3(1.0));
      // write in pixel values the screenColor.d//
-     
-     // We'll use fast fixed point atomics instead of floats.
 
-     result[3 * (uint(pos.x) + uint(pos.y) * 1024)] = screenColor.d.x;
-     result[3 * (uint(pos.x) + uint(pos.y) * 1024) + 1] = screenColor.d.y;
-     result[3 * (uint(pos.x) + uint(pos.y) * 1024) + 2] = screenColor.d.z;
+    // We'll use fast fixed point atomics instead of floats.
+    float t = 0.000000317;
+     result[3 * (uint(pos.x) + uint(pos.y) * width)] =     t* screenColor.d.x;
+     result[3 * (uint(pos.x) + uint(pos.y) * width) + 1] =  t*screenColor.d.y;
+     result[3 * (uint(pos.x) + uint(pos.y) * width) + 2] =  t* screenColor.d.z;
 
-     return float4(loss(pos.xy, (gs2d(pos.xy))), 1);
+     return float4(screenColor.p, 1);
     
 }

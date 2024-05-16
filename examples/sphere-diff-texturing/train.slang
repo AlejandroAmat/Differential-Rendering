@@ -194,6 +194,6 @@ float4 diffFragmentMain(
     float2 uv : UV,
     float4 screenPos : SV_POSITION) : SV_Target
 {
-    __bwd_diff(shadeFragment)(uv, float3(1.0));
+    __bwd_diff(loss)(uv, screenPos, float3(1.0));
     return float4(loss(uv, screenPos), 1.0);
 }

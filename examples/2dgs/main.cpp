@@ -251,6 +251,8 @@ ComPtr<gfx::IBufferResource> BlobsGradientBuffer;
 ComPtr<gfx::IResourceView> BlobsGradientBufferView;
 ComPtr<gfx::IBufferResource> ResultBuffer;
 ComPtr<gfx::IResourceView> ResultResource;
+ComPtr<gfx::IBufferResource> GradientBuffer;
+ComPtr<gfx::IResourceView> GradientBufferView;
 
 ComPtr<gfx::ITextureResource> gRefImage;
 ComPtr<gfx::IResourceView> gRefImageSRV;
@@ -345,7 +347,7 @@ ComPtr<gfx::ITextureResource> createRenderTargetTexture(gfx::Format format, int 
     {
         IResourceView::Desc desc = {};
         desc.type = IResourceView::Type::UnorderedAccess;
-        desc.bufferElementSize = 0;
+        desc.bufferElementSize = sizeof(int);
         return gDevice->createBufferView(buffer, nullptr, desc);
     }
     ComPtr<gfx::IResourceView> createUAV(ITextureResource* texture, int level)
@@ -415,7 +417,7 @@ Slang::Result initialize()
 {
    
     freopen("output.txt", "a", stdout);
-    initializeBase("PoseDiff", 1024, 1024);
+    initializeBase("2dgs", 1024, 1024);
   
     // We will create objects needed to configur the "input assembler"
     // (IA) stage of the D3D pipeline.
@@ -475,7 +477,7 @@ Slang::Result initialize()
     bufferDescb.allowedStates.add(ResourceState::ShaderResource);
     bufferDescb.allowedStates.add(ResourceState::UnorderedAccess);
     bufferDescb.allowedStates.add(ResourceState::General);
-    bufferDescb.sizeInBytes = BLOB_COUNT * sizeof (float)*8; 
+    bufferDescb.sizeInBytes = BLOB_COUNT * sizeof (int)*2; 
     bufferDescb.type = IResource::Type::Buffer ;
     BlobsGradientBuffer = gDevice->createBufferResource(bufferDescb);
     BlobsGradientBufferView = createUAV(BlobsGradientBuffer);
@@ -489,6 +491,15 @@ Slang::Result initialize()
     ResultBuffer = gDevice->createBufferResource(bufferDescr);
     ResultResource = createUAV(ResultBuffer);
   ;
+
+      gfx::IBufferResource::Desc bufferDescbe = {};
+    bufferDescbe.allowedStates.add(ResourceState::ShaderResource);
+    bufferDescbe.allowedStates.add(ResourceState::UnorderedAccess);
+    bufferDescbe.allowedStates.add(ResourceState::General);
+    bufferDescbe.sizeInBytes = BLOB_COUNT * sizeof (int); 
+    bufferDescbe.type = IResource::Type::Buffer ;
+    GradientBuffer = gDevice->createBufferResource(bufferDescbe);
+    GradientBufferView = createUAV(GradientBuffer);
         //Create Unordered Acces View of Buffers in order to update them in different pipelines
    
     
@@ -544,9 +555,10 @@ Slang::Result initialize()
             gDrawQuadPipelineState = createRenderPipelineStateQuad(inputLayout, shaderProgram);
         }
 
-    gTexView = createTextureFromFile("jardin.jpeg", textureWidth, textureHeight);
+    gTexView = createTextureFromFile("gio.jpg", textureWidth, textureHeight);
     gDepthTexture = createDepthTexture();
     gDepthTextureView = createDSV(gDepthTexture);
+    printf("%d", windowHeight);
     gRefImage = createRenderTargetTexture(Format::R8G8B8A8_UNORM, windowWidth, windowHeight, 1);
     gRefImageRTV = createRTV(gRefImage, Format::R8G8B8A8_UNORM);
     gRefImageSRV = createSRV(gRefImage);
@@ -563,6 +575,7 @@ Slang::Result initialize()
             auto encoder = commandBuffer->encodeResourceCommands();
             encoder->bufferBarrier(BlobsBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
             encoder->bufferBarrier(BlobsGradientBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
+            encoder->bufferBarrier(GradientBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
             encoder->bufferBarrier(ResultBuffer, ResourceState::Undefined, ResourceState::UnorderedAccess);
             encoder->textureBarrier(gRefImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
             encoder->textureBarrier(gResultImage, ResourceState::RenderTarget, ResourceState::ShaderResource);
@@ -582,20 +595,20 @@ float sigmoid(float x) {
 void initBlobs(){
     
     for (int i = 0; i < BLOB_COUNT*8; i+=8) {
-        blobs[i] = static_cast<float>(rand()) / RAND_MAX;
-        blobs[i + 1] = static_cast<float>(rand()) / RAND_MAX;
-    
+      blobs[i] = static_cast<float>(rand()) / RAND_MAX;
+      blobs[i + 1] = static_cast<float>(rand()) / RAND_MAX;
+
         // Scale - directly assigning 0.005f since exp(log(0.005f)) is 0.005f
-        blobs[i + 2] = 0.25f;
-        blobs[i + 3] = 0.5f;
+        blobs[i + 2] = log(0.005f);
+        blobs[i + 3] = log(0.005f);
         
         // Rotation - random between 0 and 2*pi
         blobs[i + 7] = static_cast<float>(rand()) / RAND_MAX * (2 * 3.1415926);
         
         // Color - applying sigmoid to the random values between 0.25 and 0.75
-        blobs[i + 4] = sigmoid(static_cast<float>(rand()) / RAND_MAX * 0.5f + 0.25f);
-        blobs[i + 5] = sigmoid(static_cast<float>(rand()) / RAND_MAX * 0.5f + 0.25f);
-        blobs[i + 6] = sigmoid(static_cast<float>(rand()) / RAND_MAX * 0.5f + 0.25f);
+        blobs[i + 4] = static_cast<float>(rand()) / RAND_MAX * 0.5f + 0.25f;
+        blobs[i + 5] = static_cast<float>(rand()) / RAND_MAX * 0.5f + 0.25f;
+        blobs[i + 6] = static_cast<float>(rand()) / RAND_MAX * 0.5f + 0.25f;
     }
     }
 
@@ -699,7 +712,7 @@ template <typename SetupPipelineFunc>
                 rootCursor["Uniforms"]["viewWidth"].setData(windowWidth);
                 rootCursor["Uniforms"]["viewHeight"].setData(windowHeight);
                 rootCursor["Uniforms"]["blobs"].setResource(BlobsBufferView);
-                rootCursor["Uniforms"]["blob_count"].setData(BLOB_COUNT);
+                rootCursor["Uniforms"]["blob_count"].setData(4096);
                 rootCursor["Uniforms"]["result"].setResource(ResultResource);
                
                 
@@ -713,7 +726,7 @@ template <typename SetupPipelineFunc>
         viewport.extentX = (float)windowWidth;
         viewport.extentY = (float)windowHeight;
         renderEncoder->setViewportAndScissor(viewport);
-
+        
         auto root = renderEncoder->bindPipeline(gDrawQuadPipelineState);
         ShaderCursor rootCursor(root);
         rootCursor["Uniforms"]["x"].setData(x);
@@ -732,14 +745,16 @@ template <typename SetupPipelineFunc>
 
 virtual void renderFrame(int frameBufferIndex) override
 {       
+ //printf("%d %d \n", windowHeight, windowWidth);
 
-
+    windowHeight = 1024;
+    windowWidth = 1024;
     renderReferenceImage(frameBufferIndex);
     // With that, we are done drawing for one frame, and ready for the next.
     
     renderResultImage(frameBufferIndex);
 
-    
+   // printf("%d %d", windowHeight, windowWidth);
 
      {
             ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
@@ -760,7 +775,7 @@ virtual void renderFrame(int frameBufferIndex) override
                 rootCursor["Uniforms"]["modelViewProjection"].setData(
                     &transformMatrix, sizeof(float) * 16);
                 rootCursor["Uniforms"]["sampler"].setSampler(gSampler);
-                rootCursor["Uniforms"]["texRef"].setResource(gTexView);
+                rootCursor["Uniforms"]["texRef"].setResource(gTexView) ;
                  rootCursor["Uniforms"]["x"].setData(0);
                 rootCursor["Uniforms"]["y"].setData(0);
                 rootCursor["Uniforms"]["width"].setData(windowWidth);
@@ -770,6 +785,7 @@ virtual void renderFrame(int frameBufferIndex) override
                 rootCursor["Uniforms"]["blob_count"].setData(BLOB_COUNT);
                 rootCursor["Uniforms"]["result"].setResource(ResultResource);
                 rootCursor["Uniforms"]["grad_blobs"].setResource(BlobsGradientBufferView);
+                rootCursor["Uniforms"]["grad"].setResource(GradientBufferView);
                 rootCursor["Uniforms"]["blobs"].setResource(BlobsBufferView);
                 
             
@@ -811,7 +827,7 @@ virtual void renderFrame(int frameBufferIndex) override
             gQueue->executeCommandBuffer(commandBuffer);
                 
             }
-            
+          
     
 
 
@@ -825,11 +841,11 @@ virtual void renderFrame(int frameBufferIndex) override
             gTransientHeaps[frameBufferIndex]->createCommandBuffer();
         auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
         
-        int refImageWidth = windowWidth/2;
+        int refImageWidth = windowWidth;
         int refImageHeight = refImageWidth * windowHeight / windowWidth;
         
-        drawTexturedQuad(renderEncoder, 0, 0, refImageWidth, refImageHeight, gRefImageSRV);
-        drawTexturedQuad(renderEncoder,refImageWidth, 0, refImageWidth, refImageHeight, gResultImageSRV);
+       //drawTexturedQuad(renderEncoder, 0, 0, refImageWidth, refImageHeight, gRefImageSRV);
+        drawTexturedQuad(renderEncoder,0, 0, refImageWidth, refImageHeight, gResultImageSRV);
         renderEncoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
@@ -838,39 +854,39 @@ virtual void renderFrame(int frameBufferIndex) override
     
 
     gSwapchain->present();
-
+/*gQueue->waitOnHost();
    frame++;
    if(frame == 1 || frame == 40){
-    gQueue->waitOnHost();
+        
+
     std::vector<float> params;
-    const size_t bufferSize = BlobsBuffer->getDesc()->sizeInBytes;
+    const size_t bufferSize = ResultBuffer->getDesc()->sizeInBytes;
     ComPtr<ISlangBlob> blob;
 
     // Read the buffer contents into a blob
-    gDevice->readBufferResource(BlobsBuffer, 0, bufferSize, blob.writeRef());
+    gDevice->readBufferResource(ResultBuffer, 0, bufferSize, blob.writeRef());
     if (!blob)
         printf("BAD");
 
     // Cast the blob data to the type stored in the buffer, in this case, let's assume it's float
     const float* parameters = (const float*)blob->getBufferPointer();
-    size_t paramCount = bufferSize / sizeof(int);
+    size_t paramCount = bufferSize / sizeof(float);
+    printf("%zu", paramCount);
     String var[2]= {"x", "y\n"};
     // Copy the loss values into the output vector
     params.assign(parameters, parameters + paramCount);
-    printf("%d", paramCount);
-     for(int k=0; k<paramCount; k=k+8){
-                printf("%d posx  %f \n", k,float(params[k]));
-                printf("%d posy  %f \n", k, float(params[k+1]));
-                printf("%d scalex %f \n", k, float(params[k+2]));
-                printf("%d scaley %f \n", k, float(params[k+3]));
-                printf("%d colorr %f \n", k, float(params[k+4]));
-                printf("%d colorg %f \n", k, float(params[k+5]));
-                printf("%d colorb %f \n", k, float(params[k+6]));
-                printf("%d rotation %f \n", k, float(params[k+7]));
+   
+    
+    for(int k=0; k<paramCount; k=k+3){
+                printf("%d posx  %.8f \n", k,(params[k]));
+                printf("%d posy  %.8f \n", k, (params[k+1]));
+                 printf("%d posz  %.8f \n", k, (params[k+2]));
+                
+    
     }
 
-}   
-   
+}  
+   */
 }
 };
 

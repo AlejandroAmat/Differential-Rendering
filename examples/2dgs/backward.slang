@@ -1,5 +1,8 @@
-static const float kSkipDistance = 0.1;
+#define NV_SHADER_EXTN_SLOT u0 
 
+
+
+static const float kSkipDistance = 0.1;
 struct Blob : IDifferentiable {
     float2 pos;
     float2 scale;
@@ -41,11 +44,18 @@ float gaussian(float2 x, float2x2 sigma)
 }
 
 [BackwardDifferentiable]
+float3 sigmoid(float3 x) {
+    return 1.0 / (1.0 + exp(-x));
+}
+
+[BackwardDifferentiable]
 float3 eval(no_diff float2 pos, Blob blob) {
+    float3 color = sigmoid(blob.color); // Apply sigmoid to color
+    float2 scale = exp(blob.scale);
     float2x2 R = rotation_matrix(blob.rotation);
-    float2x2 S = scale_matrix(max(blob.scale, 0.001));
+    float2x2 S = scale_matrix(max(scale, 0.001));
     float2x2 sigma = mul(mul(R, S), mul(transpose(S), transpose(R)));
-    return gaussian(pos - blob.pos, sigma) * blob.color;
+    return gaussian(pos - blob.pos, sigma) * color;
     
 }
 
@@ -65,14 +75,20 @@ cbuffer Uniforms
     int blob_count;
     RWStructuredBuffer<float> result;
     RWStructuredBuffer<int> grad_blobs;
+    RWStructuredBuffer<int> grad;
     RWStructuredBuffer<Blob> blobs;
 
 }
 
 void write_grad(uint offset, float value)
 {
+
+    //float sum = WaveActiveSum(value);
+    //if (WaveIsFirstLane())
+       InterlockedAdd(grad_blobs[offset], int(value*65336));
     
-        InterlockedAdd(grad_blobs[offset], int(value * 65536));
+
+   // InterlockedAdd(grad_blobs[0], int(sum));
 
     
 }
@@ -84,36 +100,35 @@ void computeMain(uint3 threadIdx: SV_DispatchThreadID)
 {
     uint x = threadIdx.x;
     uint y = threadIdx.y;
-    if (x >= 1024) return;
-    if (y >= 1024) return;
-
-    int2 resolution = (1024, 1024);
-    no_diff float2 pos = float2(threadIdx.xy) / resolution;
-    float d_image_r = result[(y * 1024 + x) * 3];
-    float d_image_g = result[(y * 1024 + x) * 3 + 1];
-    float d_image_b = result[(y * 1024 + x) * 3 + 2];
+    if (x >= width) return;
+    if (y >= height) return;
+    
+    int2 resolution = (width, height);
+    no_diff float2 pos = float2(threadIdx.x,threadIdx.y) / resolution;
+    float d_image_r = result[(y * width + x) * 3];
+    float d_image_g = result[(y * width + x) * 3 + 1];
+    float d_image_b = result[(y * width + x) * 3 + 2];
 
     float3 d_image = (d_image_r, d_image_g, d_image_g);
-    
 
-    for (uint i = 0; i < blob_count; ++i) {
+    int k = 0;
+    for (uint i = 0; i < blob_count-1; ++i) {
         var d_blob = diffPair(blobs[i]);
        
-        if (kSkipDistance > 0 && distance(pos, blobs[i].pos) > kSkipDistance)
+        if (kSkipDistance > 0 && distance(pos, blobs[i].pos) >0.1)
             continue;
-        bwd_diff(eval)(pos, d_blob,float3(1));
+      
+        bwd_diff(eval)(pos, d_blob,d_image);
+     
+        write_grad(i * 2, d_blob.d.pos.x);
+        write_grad(i * 2 + 1, d_blob.d.pos.y);
 
-
-        write_grad(i * 8, d_blob.d.pos.x);
-        write_grad(i * 8 + 1, d_blob.d.pos.y);
-        write_grad(i * 8 + 2, d_blob.d.scale.x);
-        write_grad(i * 8 + 3, d_blob.d.scale.y);
-        write_grad(i * 8 + 4, d_blob.d.color.r);
-        write_grad(i * 8 + 5, d_blob.d.color.g);
-        write_grad(i * 8 + 6, d_blob.d.color.b);
-        write_grad(i * 8 + 7, d_blob.d.rotation);
 
         
+        //else result[i * 3] = 33;
+       
+        
+      
     }
     
 

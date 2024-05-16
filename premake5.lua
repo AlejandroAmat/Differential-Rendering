@@ -791,6 +791,7 @@ function example(name)
     end
 
     if targetInfo.isWindows then
+        
     else
         if enableXlib then
             defines { "SLANG_ENABLE_XLIB" }
@@ -857,7 +858,7 @@ example "pose-cube"
     includedirs {"examples/pose-cube/"}
 example "pose-cube-diff"
 example "2dgs"
-
+    includedirs {"examples/2dgs/nvapi/"}
 
 if enableAftermath then
     example "nv-aftermath-example"

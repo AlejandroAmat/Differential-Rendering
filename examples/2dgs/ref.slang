@@ -73,7 +73,7 @@ VertexStageOutput vertexMain(
 float4 fragmentMain(
     CoarseVertex coarseVertex: CoarseVertex) : SV_Target
 {
-    return float4(texRef.Sample(sampler, coarseVertex.uv).xyz, 1.0);
+    return float4(texRef.Sample(sampler, coarseVertex.uv).xyz +float3(0.05), 1.0);
 }
 
 
