@@ -7,7 +7,7 @@ This directory contains small example programs showing how to use the Slang lang
 
 * The [`sphere-diff-texturing`](sphere-diff-texturing/) example shows how Slang's support automatic differentiation for a inverse renderintg scenario with sphere texturing.
 
-* The [`2DGS`](2DGS/) example shows how Slang's support automatic differentiation for a 2D gaussian splatting application.
+* The [`2dgs`](2dgs/) example shows how Slang's support automatic differentiation for a 2D gaussian splatting application.
 
 Most of the examples presented here use a software layer called `gfx` (exposed via `slang-gfx.h`) to abstract over the differences between various target APIs/platforms (D3D11, D3D12, OpenGL, Vulkan, CUDA, and CPU).
 Using `gfx` is not a requirement for using Slang, but it provides a concrete example of how tight integration of Slang's features into a GPU abstraction layer can provide for a clean and usable application programming model.
