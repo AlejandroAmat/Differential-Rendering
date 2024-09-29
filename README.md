@@ -1,4 +1,4 @@
-# Slang Differential for Inverse Rendering
+# Slang Differential for Inverse Rendering (Texture & 2D Gaussian Splatting)
 ## Overview
 
 This project aims to bridge the gap between high-level differential programming and real-time graphics rendering, focusing on inverse rendering applications. By translating and extending the capabilities of the NDiffr library into Slang—a shading language designed for real-time graphics—we leverage automatic differentiation (AD) to facilitate the development of differentiable rendering techniques. This approach not only democratizes access to advanced rendering algorithms but also streamlines the process of integrating AD into existing graphics pipelines.
