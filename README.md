@@ -73,7 +73,7 @@ When running the differential texturing example, you'll see three components in 
 
 Each frame applies a random model-view-projection matrix to test the robustness of the learnt texture.
 
-![Differential Texture Learning Output](examples/sphere-texture-diff/sphere-diff.png)
+![Differential Texture Learning Output](sphere-diff.png)
 
 *Fig 1: Output of the differential texturing example showing learnt texture (left), reference texture (top right), and loss visualization (bottom right).*
 
@@ -106,30 +106,7 @@ Key optimizations that contribute to the exceptional performance include:
 - Efficient gradient calculation and propagation
 - GPU-accelerated parallel processing
 - Memory-optimized data structures
-- Tile-based processing for improved cache coherence
 
-## Future Work
 
-Future development will focus on:
 
-- Extending the framework to support additional rendering techniques
-- Improving the scalability for larger scenes
-- Integrating with existing rendering engines and frameworks
-- Supporting more complex material models and lighting effects
 
-## Citation
-
-If you use this code in your research, please cite:
-
-```
-@software{slang_differential,
-  author = {Your Name},
-  title = {Slang Differential for Inverse Rendering},
-  year = {2025},
-  url = {https://github.com/yourusername/slang-differential}
-}
-```
-
-## License
-
-[Your License Information]
