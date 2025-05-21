@@ -14,6 +14,9 @@ Key features:
 
 ![2D Gaussian Splatting Results](gs.gif)
 
+*Fig 1: 2dgs training*
+
+
 ## Applications
 
 ### Differential Texturing
@@ -77,7 +80,7 @@ Each frame applies a random model-view-projection matrix to test the robustness 
 
 ![Differential Texture Learning Output](sphere-diff.png)
 
-*Fig 1: Output of the differential texturing example showing learnt texture (left), reference texture (top right), and loss visualization (bottom right).*
+*Fig 2: Output of the differential texturing example showing learnt texture (left), reference texture (top right), and loss visualization (bottom right).*
 
 ### 2D Gaussian Splatting Output
 
@@ -89,7 +92,7 @@ The 2DGS example demonstrates:
 
 ![2D Gaussian Splatting Results](Captura%20de%20pantalla%202025-05-15%20a%20las%2013.40.54.png)
 
-*Fig 2: Output of the 2D Gaussian Splatting example showing the optimized scene with accurate geometry representation.*
+*Fig 3: Output of the 2D Gaussian Splatting example showing the optimized scene with accurate geometry representation.*
 
 ## Technical Details
 
