@@ -12,6 +12,8 @@ Key features:
 - **Real-time inverse rendering**: Optimize scene properties through gradient descent within the rendering pipeline
 - **Unified framework**: Support for both texture optimization and 2D Gaussian Splatting in one codebase
 
+![2D Gaussian Splatting Results](gs.gif)
+
 ## Applications
 
 ### Differential Texturing
